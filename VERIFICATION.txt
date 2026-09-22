@@ -1,0 +1,32 @@
+CHANGED_BRANCH: auth-ui.visual-assets
+CHANGED_FIELDS: src/app/index.tsx image sources; assets/images/careloop transparent lockups.
+
+ARTIFACTS:
+MODIFIED_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/index.tsx
+DIFF_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/DIFF_FILE
+VERIFICATION_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/VERIFICATION.txt
+ROLLBACK_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/ROLLBACK.sh
+
+BASELINE_COMMAND: npx tsc --noEmit
+BASELINE_INPUT: existing CareLoopPatient TypeScript source before the transparent-lockup asset update.
+BASELINE_LITERAL_OUTPUT: [empty]
+BASELINE_RESULT: exit 0
+
+MODIFIED_COMMAND: npx tsc --noEmit
+MODIFIED_INPUT: CareLoopPatient source with splash/welcome visual implementation and transparent lockup assets.
+MODIFIED_LITERAL_OUTPUT: [empty]
+MODIFIED_RESULT: exit 0
+
+LINT_COMMAND: npm run lint
+LINT_INPUT: CareLoopPatient source after the UI changes.
+LINT_LITERAL_OUTPUT: src/hooks/use-color-scheme.web.ts:11:5 error react-hooks/set-state-in-effect
+LINT_RESULT: exit 1; one pre-existing error remains.
+
+ROLLBACK_COMMAND: TARGET_ROOT="$TMP" ./ROLLBACK.sh
+ROLLBACK_INPUT: isolated copy of src/app/index.tsx plus both transparent lockup assets.
+ROLLBACK_LITERAL_OUTPUT: rollback copy restored
+ROLLBACK_RESULT: exit 0; isolated copy references the original lockups and transparent files are removed; working MODIFIED_FILE remains changed.
+
+SIMULATOR_COMMAND: npx expo start --ios --port 8083
+SIMULATOR_LITERAL_RESULT: Metro bundled 1287 modules and opened exp://172.22.19.116:8083 on iPhone 17 Pro Max.
+VISUAL_RESULT: welcome and QR screens verified in the simulator; the crop rectangle was removed from the CareLoop lockup, and Get Started reaches the QR connection screen.

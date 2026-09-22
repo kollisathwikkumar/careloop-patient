@@ -1,0 +1,8 @@
+CHANGED_BRANCH: auth-ui.visual-assets
+CHANGED_FIELDS:
+- src/app/index.tsx -> use transparent CareLoop logo/splash lockups so the simulator matches the reference backdrop without a crop rectangle.
+- assets/images/careloop/logo-lockup-transparent.png
+- assets/images/careloop/splash-lockup-transparent.png
+
+MODIFIED_FILE: src/app/index.tsx
+MODIFIED_HASH_SHA256: bea5dcbfc708487006f8b54fa181d73941b84a51bda4d2a6ea95e26f1d933071

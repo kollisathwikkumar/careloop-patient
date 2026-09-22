@@ -21,11 +21,11 @@ export default function AppTabs() {
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
-          <TabTrigger name="home" href="/" asChild>
+          <TabTrigger name="home" href="/home" asChild>
             <TabButton>Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="explore" href="/explore" asChild>
-            <TabButton>Explore</TabButton>
+          <TabTrigger name="journey" href="/journey" asChild>
+            <TabButton>Care Journey</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -55,14 +55,14 @@ export function CustomTabList(props: TabListProps) {
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
         <ThemedText type="smallBold" style={styles.brandText}>
-          Expo Starter
+          CareLoop
         </ThemedText>
 
         {props.children}
 
-        <ExternalLink href="https://docs.expo.dev" asChild>
+        <ExternalLink href="https://supabase.com" asChild>
           <Pressable style={styles.externalPressable}>
-            <ThemedText type="link">Docs</ThemedText>
+            <ThemedText type="link">Support</ThemedText>
             <SymbolView
               tintColor={colors.text}
               name={{ ios: 'arrow.up.right.square', web: 'link' }}
