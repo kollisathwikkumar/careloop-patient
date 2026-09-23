@@ -1,59 +1,80 @@
+import { Image } from 'expo-image';
+import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
-import { supabase } from '@/lib/supabase';
+function ActionHotspot({
+  accessibilityLabel,
+  onPress,
+  style,
+}: {
+  accessibilityLabel: string;
+  onPress: () => void;
+  style: object;
+}) {
+  return <Pressable accessibilityLabel={accessibilityLabel} accessibilityRole="button" onPress={onPress} style={[styles.hotspot, style]} />;
+}
+
+function showMessage(title: string, message: string): void {
+  Alert.alert(title, message);
+}
 
 export default function HomeScreen() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <ThemedText style={styles.eyebrow}>YOUR CARELOOP</ThemedText>
-        <ThemedText style={styles.title}>Your next step</ThemedText>
-        <View style={styles.card}>
-          <ThemedText style={styles.cardEyebrow}>GET CONNECTED</ThemedText>
-          <ThemedText style={styles.cardTitle}>Connect your care team</ThemedText>
-          <ThemedText style={styles.cardBody}>
-            Ask your doctor or care team for a secure connection code to begin your journey.
-          </ThemedText>
-        </View>
-        <ThemedText style={styles.sectionTitle}>Care Journey</ThemedText>
-        <View style={styles.emptyCard}>
-          <ThemedText style={styles.emptyTitle}>Your journey starts here</ThemedText>
-          <ThemedText style={styles.emptyBody}>
-            Your appointments and follow-ups will appear here once you connect.
-          </ThemedText>
-        </View>
-        <ThemedText
-          accessibilityRole="button"
-          onPress={() => {
-            void supabase.auth.signOut();
-            router.replace('/');
-          }}
-          style={styles.signOut}>
-          Sign out
-        </ThemedText>
-      </ScrollView>
-    </SafeAreaView>
+    <View style={styles.screen}>
+      <StatusBar hidden />
+      <Image
+        accessibilityLabel="CareLoop home dashboard"
+        contentFit="fill"
+        source={require('@/assets/images/careloop/home-dashboard-reference.png')}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <ActionHotspot
+        accessibilityLabel="Attend follow-up appointment"
+        onPress={() => showMessage("I'll attend", 'Your follow-up appointment is confirmed.')}
+        style={styles.attendHotspot}
+      />
+      <ActionHotspot
+        accessibilityLabel="Request reschedule"
+        onPress={() => showMessage('Request reschedule', 'Your care team will help you choose another time.')}
+        style={styles.rescheduleHotspot}
+      />
+      <ActionHotspot
+        accessibilityLabel="Open care journey"
+        onPress={() => router.replace('/journey')}
+        style={styles.journeyHotspot}
+      />
+      <ActionHotspot
+        accessibilityLabel="Open doctor connection"
+        onPress={() => showMessage('Your doctor', 'Dr. K. Sathwik is connected.')}
+        style={styles.doctorHotspot}
+      />
+      <ActionHotspot
+        accessibilityLabel="Open reminder"
+        onPress={() => showMessage('Reminder', 'Tomorrow at 10:30 AM.')}
+        style={styles.reminderHotspot}
+      />
+      <View style={styles.bottomNav}>
+        <ActionHotspot accessibilityLabel="Home" onPress={() => undefined} style={styles.navHotspot} />
+        <ActionHotspot accessibilityLabel="Journey" onPress={() => router.replace('/journey')} style={styles.navHotspot} />
+        <ActionHotspot accessibilityLabel="Alerts" onPress={() => router.replace('/alerts')} style={styles.navHotspot} />
+        <ActionHotspot accessibilityLabel="More" onPress={() => showMessage('More', 'More CareLoop options.')} style={styles.navHotspot} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.light.background },
-  container: { padding: Spacing.four, paddingBottom: 120 },
-  eyebrow: { color: '#5878A2', fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
-  title: { color: '#123B80', fontSize: 32, fontWeight: '800', marginTop: Spacing.one, marginBottom: Spacing.four },
-  card: { backgroundColor: '#123B80', borderRadius: 26, padding: Spacing.four, marginBottom: Spacing.five },
-  cardEyebrow: { color: '#BDEAFF', fontSize: 12, fontWeight: '800', letterSpacing: 1.1, marginBottom: Spacing.three },
-  cardTitle: { color: '#FFFFFF', fontSize: 28, lineHeight: 34, fontWeight: '800', marginBottom: Spacing.two },
-  cardBody: { color: '#DDEFFF', fontSize: 16, lineHeight: 24 },
-  sectionTitle: { color: '#123B80', fontSize: 25, fontWeight: '800', marginBottom: Spacing.three },
-  emptyCard: { backgroundColor: '#E0F4FF', borderRadius: 22, padding: Spacing.four, alignItems: 'center' },
-  emptyTitle: { color: '#123B80', fontSize: 19, fontWeight: '800', marginBottom: Spacing.two },
-  emptyBody: { color: '#5878A2', fontSize: 15, lineHeight: 22, textAlign: 'center' },
-  signOut: { color: '#5878A2', textAlign: 'center', padding: Spacing.four, marginTop: Spacing.three },
+  screen: { flex: 1, backgroundColor: '#F7FCFF' },
+  hotspot: { position: 'absolute', backgroundColor: 'transparent' },
+  attendHotspot: { left: '6%', right: '6%', top: '47%', height: '6%' },
+  rescheduleHotspot: { left: '6%', right: '6%', top: '53%', height: '6%' },
+  journeyHotspot: { left: '4%', right: '4%', top: '61%', height: '14%' },
+  doctorHotspot: { left: '4%', right: '4%', top: '76%', height: '9%' },
+  reminderHotspot: { left: '4%', right: '4%', top: '85%', height: '8%' },
+  bottomNav: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '10%', flexDirection: 'row' },
+  navHotspot: { position: 'relative', flex: 1, height: '100%' },
 });

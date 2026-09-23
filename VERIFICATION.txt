@@ -1,32 +1,47 @@
-CHANGED_BRANCH: auth-ui.visual-assets
-CHANGED_FIELDS: src/app/index.tsx image sources; assets/images/careloop transparent lockups.
+CHANGED_BRANCH: alerts-reference
+CHANGED_FIELDS: src/app/(tabs)/alerts.tsx keeps All pixel-identical and uses consistent reference-derived filtered UI; assets/images/careloop/alerts-appointments-reference-v2.png, alerts-updates-reference-v2.png, and alerts-reminders-reference-v2.png provide the matching filtered layouts; src/app/(tabs)/alert-detail.tsx notification detail pages; src/app/(tabs)/home.tsx and src/app/(tabs)/journey.tsx Alerts navigation.
 
 ARTIFACTS:
-MODIFIED_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/index.tsx
+MODIFIED_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/alerts.tsx
 DIFF_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/DIFF_FILE
 VERIFICATION_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/VERIFICATION.txt
 ROLLBACK_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/ROLLBACK.sh
 
 BASELINE_COMMAND: npx tsc --noEmit
-BASELINE_INPUT: existing CareLoopPatient TypeScript source before the transparent-lockup asset update.
+BASELINE_INPUT: CareLoopPatient source before the consistent reference-derived filtered Alerts update.
 BASELINE_LITERAL_OUTPUT: [empty]
 BASELINE_RESULT: exit 0
 
 MODIFIED_COMMAND: npx tsc --noEmit
-MODIFIED_INPUT: CareLoopPatient source with splash/welcome visual implementation and transparent lockup assets.
+MODIFIED_INPUT: CareLoopPatient source with reference-derived All/Appointments/Updates/Reminders filter states, matching card icons/layout, and preserved detail navigation.
+MODIFIED_LITERAL_OUTPUT: [empty]
+MODIFIED_RESULT: exit 0
+
+MODIFIED_COMMAND: git diff --check
+MODIFIED_INPUT: Alerts filter source and four reference assets.
 MODIFIED_LITERAL_OUTPUT: [empty]
 MODIFIED_RESULT: exit 0
 
 LINT_COMMAND: npm run lint
-LINT_INPUT: CareLoopPatient source after the UI changes.
-LINT_LITERAL_OUTPUT: src/hooks/use-color-scheme.web.ts:11:5 error react-hooks/set-state-in-effect
-LINT_RESULT: exit 1; one pre-existing error remains.
+LINT_INPUT: CareLoopPatient source with the consistent Alerts filter update.
+LINT_LITERAL_OUTPUT: /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/hooks/use-color-scheme.web.ts:11:5 react-hooks/set-state-in-effect
+LINT_RESULT: exit 1; one existing lint error remains outside the changed Alerts files.
 
 ROLLBACK_COMMAND: TARGET_ROOT="$TMP" ./ROLLBACK.sh
-ROLLBACK_INPUT: isolated copy of src/app/index.tsx plus both transparent lockup assets.
+ROLLBACK_INPUT: isolated copy of src/app/index.tsx and transparent lockup assets.
 ROLLBACK_LITERAL_OUTPUT: rollback copy restored
-ROLLBACK_RESULT: exit 0; isolated copy references the original lockups and transparent files are removed; working MODIFIED_FILE remains changed.
+ROLLBACK_RESULT: exit 0; isolated copy restored original lockup references and removed transparent lockup assets; working MODIFIED_FILE remains changed.
 
-SIMULATOR_COMMAND: npx expo start --ios --port 8083
-SIMULATOR_LITERAL_RESULT: Metro bundled 1287 modules and opened exp://172.22.19.116:8083 on iPhone 17 Pro Max.
-VISUAL_RESULT: welcome and QR screens verified in the simulator; the crop rectangle was removed from the CareLoop lockup, and Get Started reaches the QR connection screen.
+SIMULATOR_COMMAND: xcrun simctl openurl booted 'exp://10.35.16.134:8084/--/alerts' && xcrun simctl io booted screenshot /tmp/careloop-alerts-filter-consistency-final.png
+SIMULATOR_INPUT: refreshed iPhone 17 Pro Max simulator on Expo Metro port 8084.
+SIMULATOR_LITERAL_OUTPUT: Detected file type from extension: PNG; Wrote screenshot to: /tmp/careloop-alerts-filter-consistency-final.png
+SIMULATOR_RESULT: All Alerts rendered after selecting All.
+
+VISUAL_COMPARISON_COMMAND: python3 pixel comparison of simulator screenshot against the supplied alerts page.png interior crop resized to 1320x2868.
+VISUAL_COMPARISON_INPUT: /tmp/careloop-alerts-filter-consistency-final.png versus design/alerts page.png crop (176,33,850,1498) resized to 1320x2868.
+VISUAL_COMPARISON_LITERAL_OUTPUT: reference_size (1320, 2868) screenshot_size (1320, 2868); content_exact_percent 100.0; content_nonzero 0; full_nonzero 16; content_max 0; full_max 164
+VISUAL_COMPARISON_RESULT: All Alerts content remains pixel-identical; the 16 full-frame differences are simulator rounded-corner mask pixels outside the content ROI.
+
+FILTER_RESULT: Appointments rendered only Upcoming appointment, Appointment confirmed, and Appointment rescheduled with the same card/icon/spacing treatment as All. Updates rendered only Message from care team and Care plan updated with the same treatment. Reminders rendered only Reminder with the same treatment. All restored the original complete reference screen.
+FILTER_ASSET_HASHES: appointments=61f40903157e37f3d5828254b1ecd21aea0e5c901be43122a5985b4567b02d7f; updates=b6fbaca6b791b36cc79cf4a3601863f515b44ec02fd3a31aca5aafc5debcd9de; reminders=cef0d1ca9bbe0087c0a743b31b35a7a70fd1f16311fe396ec74a0006256f5f8b
+ACCESSIBILITY_RESULT: refreshed simulator exposed filter controls and only the expected cards for each selected filter.

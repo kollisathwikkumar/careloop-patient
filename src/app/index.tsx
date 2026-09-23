@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { Image } from 'expo-image';
+import { SymbolView } from 'expo-symbols';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -20,7 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
-type FlowStep = 'splash' | 'welcome' | 'qr' | 'code' | 'phone' | 'otp';
+type FlowStep = 'splash' | 'welcome' | 'qr' | 'code' | 'doctorConfirm' | 'connected' | 'phone' | 'otp';
 
 type PrimaryButtonProps = {
   label: string;
@@ -146,7 +147,11 @@ function HelpButton() {
   );
 }
 
-function QrConnectionScreen({ onBack, onCode }: { onBack: () => void; onCode: () => void }) {
+function CareSymbol({ name, color, size = 22 }: { name: Parameters<typeof SymbolView>[0]['name']; color: string; size?: number }) {
+  return <SymbolView name={name} size={size} tintColor={color} weight="semibold" />;
+}
+
+function QrConnectionScreen({ onBack, onCode, onScanned }: { onBack: () => void; onCode: () => void; onScanned: () => void }) {
   return (
     <WaveBackdrop>
       <SafeAreaView style={styles.screenSafeArea}>
@@ -180,7 +185,7 @@ function QrConnectionScreen({ onBack, onCode }: { onBack: () => void; onCode: ()
             <PrimaryButton
               label="Scan QR Code"
               icon="⌗"
-              onPress={() => Alert.alert('Camera access', 'QR scanning will open here when camera access is enabled.')}
+              onPress={onScanned}
             />
             <PrimaryButton label="Enter connection code" onPress={onCode} variant="outline" />
           </View>
@@ -195,7 +200,7 @@ function ScannerCorner({ position }: { position: 'topLeft' | 'topRight' | 'botto
   return <View style={[styles.scannerCorner, styles[position]]} />;
 }
 
-function ConnectionCodeScreen({ onBack }: { onBack: () => void }) {
+function ConnectionCodeScreen({ onBack, onContinue }: { onBack: () => void; onContinue: () => void }) {
   const [code, setCode] = useState('');
   return (
     <WaveBackdrop>
@@ -225,7 +230,7 @@ function ConnectionCodeScreen({ onBack }: { onBack: () => void }) {
             />
             <PrimaryButton
               label="Continue"
-              onPress={() => Alert.alert('Connection code', code.trim() ? 'We will verify this code with your care team.' : 'Enter your connection code to continue.')}
+              onPress={onContinue}
               disabled={!code.trim()}
             />
           </ScrollView>
@@ -233,6 +238,86 @@ function ConnectionCodeScreen({ onBack }: { onBack: () => void }) {
         <ThemedText style={styles.qrFooter}>A healthier tomorrow,{`\n`}together.</ThemedText>
       </SafeAreaView>
     </WaveBackdrop>
+  );
+}
+
+function PlainScreen({ children }: { children: ReactNode }) {
+  return (
+    <View style={styles.plainBackdrop}>
+      <StatusBar style="dark" />
+      {children}
+    </View>
+  );
+}
+
+function DoctorConfirmationScreen({ onBack, onConnect, onCancel }: { onBack: () => void; onConnect: () => void; onCancel: () => void }) {
+  return (
+    <PlainScreen>
+      <SafeAreaView style={styles.screenSafeArea}>
+        <ScrollView contentContainerStyle={styles.confirmScroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.confirmTopBar}>
+            <BackButton onPress={onBack} />
+            <HelpButton />
+          </View>
+          <ThemedText style={styles.confirmHeading}>
+            <ThemedText style={styles.headingNavy}>You are </ThemedText>
+            <ThemedText style={styles.headingBlue}>connecting with</ThemedText>
+          </ThemedText>
+          <Image contentFit="cover" source={require('@/assets/images/careloop/doctor-avatar.png')} style={styles.doctorAvatar} />
+          <ThemedText style={styles.doctorName}>Dr. K. Sathwik</ThemedText>
+          <ThemedText style={styles.doctorRole}>General Medicine</ThemedText>
+          <ThemedText style={styles.doctorHospital}>City Care Hospital</ThemedText>
+          <View style={styles.verifiedPill}><CareSymbol name="checkmark.seal.fill" color="#1685F1" size={18} /><ThemedText style={styles.verifiedText}>Verified Doctor</ThemedText></View>
+
+          <View style={styles.permissionCard}>
+            <ThemedText style={styles.permissionTitle}>This will allow your doctor to:</ThemedText>
+            <PermissionRow icon="calendar" tint="#1685F1" background="#E5F3FF" title="Send your follow-up schedule" body="Get reminders for your appointments" />
+            <PermissionRow icon="document" tint="#10C99D" background="#DDFBF4" title="Share appointment reminders" body="Stay on track with your care" />
+            <PermissionRow icon="chart.bar.fill" tint="#6841E8" background="#EDE9FF" title="Keep track of your care journey" body="All your health information in one place" />
+          </View>
+          <View style={styles.confirmActions}>
+            <PrimaryButton label="Connect" icon="→" onPress={onConnect} />
+            <PrimaryButton label="Cancel" onPress={onCancel} variant="outline" />
+          </View>
+          <View style={styles.secureFooter}><CareSymbol name="lock.fill" color="#6E89AE" size={14} /><ThemedText style={styles.secureFooterText}>Your information is secure and private.</ThemedText></View>
+        </ScrollView>
+      </SafeAreaView>
+    </PlainScreen>
+  );
+}
+
+function PermissionRow({ icon, tint, background, title, body }: { icon: Parameters<typeof SymbolView>[0]['name']; tint: string; background: string; title: string; body: string }) {
+  return (
+    <View style={styles.permissionRow}>
+      <View style={[styles.permissionIcon, { backgroundColor: background }]}><CareSymbol name={icon} color={tint} size={22} /></View>
+      <View style={styles.permissionCopy}><ThemedText style={styles.permissionRowTitle}>{title}</ThemedText><ThemedText style={styles.permissionRowBody}>{body}</ThemedText></View>
+    </View>
+  );
+}
+
+function ConnectedScreen({ onContinue, onHome }: { onContinue: () => void; onHome: () => void }) {
+  return (
+    <PlainScreen>
+      <SafeAreaView style={styles.screenSafeArea}>
+        <ScrollView contentContainerStyle={styles.connectedScroll} showsVerticalScrollIndicator={false} bounces={false}>
+          <View style={styles.confetti}>
+            <View style={[styles.confettiPiece, styles.confettiOne]} /><View style={[styles.confettiPiece, styles.confettiTwo]} /><View style={[styles.confettiPiece, styles.confettiThree]} /><View style={[styles.confettiPiece, styles.confettiFour]} /><View style={[styles.confettiPiece, styles.confettiFive]} /><View style={[styles.confettiPiece, styles.confettiSix]} />
+            <View style={styles.successCircle}><ThemedText style={styles.successCheck}>✓</ThemedText></View>
+          </View>
+          <ThemedText style={styles.connectedTitle}>You’re connected!</ThemedText>
+          <ThemedText style={styles.connectedIntro}>Your doctor can now send you{`\n`}follow-up schedules and appointment{`\n`}reminders.</ThemedText>
+          <View style={styles.syncCard}>
+            <PermissionRow icon="calendar" tint="#1685F1" background="#E5F3FF" title="Appointments synced" body="Get timely reminders" />
+            <PermissionRow icon="document" tint="#10C99D" background="#DDFBF4" title="Stay informed" body="All your care details in one place" />
+            <PermissionRow icon="heart" tint="#6841E8" background="#EDE9FF" title="Better care together" body="A healthier tomorrow, together." />
+          </View>
+          <View style={styles.confirmActions}>
+            <PrimaryButton label="Continue" icon="→" onPress={onContinue} />
+            <PrimaryButton label="Go to Home" onPress={onHome} variant="outline" />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </PlainScreen>
   );
 }
 
@@ -348,18 +433,22 @@ export default function HomeRoute() {
 
   const signOut = async (): Promise<void> => { await supabase.auth.signOut(); setSession(null); setStep('welcome'); };
   const go = (next: FlowStep): void => { setError(null); setStep(next); };
+  const openHome = (): void => { router.replace('/home'); };
 
   if (session) return <HomeScreen session={session} onSignOut={signOut} />;
   if (step === 'splash') return <SplashScreenView />;
   if (step === 'welcome') return <WelcomeScreen onGetStarted={() => go('qr')} onSignIn={() => go('phone')} />;
-  if (step === 'qr') return <QrConnectionScreen onBack={() => go('welcome')} onCode={() => go('code')} />;
-  if (step === 'code') return <ConnectionCodeScreen onBack={() => go('qr')} />;
+  if (step === 'qr') return <QrConnectionScreen onBack={() => go('welcome')} onCode={() => go('code')} onScanned={() => go('doctorConfirm')} />;
+  if (step === 'code') return <ConnectionCodeScreen onBack={() => go('qr')} onContinue={() => go('doctorConfirm')} />;
+  if (step === 'doctorConfirm') return <DoctorConfirmationScreen onBack={() => go('code')} onCancel={() => go('qr')} onConnect={() => go('connected')} />;
+  if (step === 'connected') return <ConnectedScreen onContinue={openHome} onHome={openHome} />;
   if (step === 'phone') return <PhoneScreen error={error} loading={loading} onBack={() => go('welcome')} onPhoneChange={setPhone} onSend={requestOtp} phone={phone} />;
   return <OtpScreen error={error} loading={loading} onBack={() => go('phone')} onOtpChange={setOtp} onVerify={verifyOtp} otp={otp} phone={phone} />;
 }
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: '#F7FCFF', overflow: 'hidden' },
+  plainBackdrop: { flex: 1, backgroundColor: '#FFFFFF' },
   softGlowTop: { position: 'absolute', width: 420, height: 420, borderRadius: 210, backgroundColor: '#E4F6FF', top: -180, left: -170, opacity: 0.9 },
   softGlowRight: { position: 'absolute', width: 280, height: 280, borderRadius: 140, backgroundColor: '#E2F5FF', top: 220, right: -150, opacity: 0.7 },
   waveOne: { position: 'absolute', width: 540, height: 220, borderRadius: 260, backgroundColor: '#DDF4FF', left: -120, bottom: -30, transform: [{ rotate: '-12deg' }], opacity: 0.88 },
@@ -410,6 +499,41 @@ const styles = StyleSheet.create({
   scanGlyphBottomRight: { position: 'absolute', bottom: 0, right: 0, width: 40, height: 40, borderBottomWidth: 13, borderRightWidth: 13, borderColor: '#91BFE4', borderBottomRightRadius: 17 },
   qrActions: { width: '100%', gap: 14 },
   qrFooter: { position: 'absolute', bottom: 30, alignSelf: 'center', color: '#315F99', fontSize: 17, lineHeight: 24, textAlign: 'center' },
+  confirmScroll: { paddingHorizontal: 26, paddingTop: 0, paddingBottom: 10, alignItems: 'center' },
+  confirmTopBar: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
+  confirmHeading: { textAlign: 'center', width: '100%', fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -1.2, marginBottom: 20 },
+  doctorAvatar: { width: 150, height: 150, borderRadius: 75, marginBottom: 8 },
+  doctorName: { color: '#123B80', fontSize: 27, lineHeight: 32, fontWeight: '800', textAlign: 'center' },
+  doctorRole: { color: '#5878A2', fontSize: 17, lineHeight: 22, marginTop: 1, textAlign: 'center' },
+  doctorHospital: { color: '#6685AA', fontSize: 15, lineHeight: 20, marginTop: 4, textAlign: 'center' },
+  verifiedPill: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E5F3FF', borderRadius: 24, paddingHorizontal: 18, paddingVertical: 8, marginTop: 10 },
+  verifiedIcon: { color: '#1685F1', fontSize: 18, fontWeight: '800' },
+  verifiedText: { color: '#1685F1', fontSize: 15, fontWeight: '600' },
+  permissionCard: { width: '100%', borderWidth: 1.5, borderColor: '#D4ECFF', borderRadius: 20, padding: 15, marginTop: 18, marginBottom: 18 },
+  permissionTitle: { color: '#123B80', fontSize: 18, lineHeight: 23, fontWeight: '800', marginBottom: 2 },
+  permissionRow: { flexDirection: 'row', alignItems: 'center', marginTop: 15 },
+  permissionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  permissionIconText: { fontSize: 20, fontWeight: '700' },
+  permissionCopy: { flex: 1, marginLeft: 12 },
+  permissionRowTitle: { color: '#123B80', fontSize: 14, lineHeight: 18, fontWeight: '600' },
+  permissionRowBody: { color: '#6685AA', fontSize: 12, lineHeight: 16, marginTop: 1 },
+  confirmActions: { width: '100%', gap: 10 },
+  secureFooter: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 13 },
+  secureFooterText: { color: '#6E89AE', fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  connectedScroll: { flexGrow: 1, paddingHorizontal: 26, paddingTop: 120, paddingBottom: 18, alignItems: 'center' },
+  confetti: { width: 210, height: 178, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  successCircle: { width: 132, height: 132, borderRadius: 66, backgroundColor: '#12C995', alignItems: 'center', justifyContent: 'center', shadowColor: '#12C995', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 5 } },
+  successCheck: { color: '#FFFFFF', fontSize: 70, lineHeight: 78, fontWeight: '300', marginTop: -6 },
+  confettiPiece: { position: 'absolute', width: 13, height: 24, borderRadius: 3 },
+  confettiOne: { backgroundColor: '#6BA5F4', top: 16, left: 33, transform: [{ rotate: '28deg' }] },
+  confettiTwo: { backgroundColor: '#F6B42A', top: 34, right: 28, transform: [{ rotate: '34deg' }] },
+  confettiThree: { backgroundColor: '#13B980', top: 82, left: 2, transform: [{ rotate: '-32deg' }] },
+  confettiFour: { backgroundColor: '#1788EA', top: 88, right: 0, transform: [{ rotate: '64deg' }] },
+  confettiFive: { backgroundColor: '#F8B22C', bottom: 34, left: 28, transform: [{ rotate: '50deg' }] },
+  confettiSix: { backgroundColor: '#12C995', bottom: 24, right: 34, transform: [{ rotate: '-52deg' }] },
+  connectedTitle: { color: '#123B80', fontSize: 31, lineHeight: 37, fontWeight: '800', textAlign: 'center', marginTop: 25 },
+  connectedIntro: { color: '#6685AA', fontSize: 17, lineHeight: 24, textAlign: 'center', marginTop: 10, marginBottom: 16 },
+  syncCard: { width: '100%', backgroundColor: '#F2F8FF', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 10, marginBottom: 14 },
   codeScroll: { paddingHorizontal: 26, paddingTop: 20, paddingBottom: 120 },
   codeInput: { minHeight: 60, width: '100%', borderWidth: 1.5, borderColor: '#35AFFF', borderRadius: 18, paddingHorizontal: 20, color: '#123B80', fontSize: 20, marginTop: 34, marginBottom: 20, backgroundColor: 'rgba(247,252,255,0.8)' },
   keyboardShell: { flex: 1 },

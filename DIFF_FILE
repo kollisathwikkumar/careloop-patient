@@ -1,8 +1,12 @@
-CHANGED_BRANCH: auth-ui.visual-assets
+CHANGED_BRANCH: alerts-reference
 CHANGED_FIELDS:
-- src/app/index.tsx -> use transparent CareLoop logo/splash lockups so the simulator matches the reference backdrop without a crop rectangle.
-- assets/images/careloop/logo-lockup-transparent.png
-- assets/images/careloop/splash-lockup-transparent.png
+- src/app/(tabs)/alerts.tsx -> keeps the All screen pixel-identical and switches filter states to the same reference-derived card, icon, spacing, typography, chip, and bottom-navigation treatment.
+- assets/images/careloop/alerts-appointments-reference-v2.png -> reference-derived Appointments filter with Upcoming appointment, Appointment confirmed, and Appointment rescheduled.
+- assets/images/careloop/alerts-updates-reference-v2.png -> reference-derived Updates filter with Message from care team and Care plan updated.
+- assets/images/careloop/alerts-reminders-reference-v2.png -> reference-derived Reminders filter with Reminder.
+- src/app/(tabs)/alert-detail.tsx -> retains functional notification detail pages.
+- src/app/(tabs)/home.tsx and src/app/(tabs)/journey.tsx -> retain Alerts navigation.
+- DIFF_FILE, VERIFICATION.txt, ROLLBACK.sh -> verification and rollback artifacts retained and updated.
 
-MODIFIED_FILE: src/app/index.tsx
-MODIFIED_HASH_SHA256: bea5dcbfc708487006f8b54fa181d73941b84a51bda4d2a6ea95e26f1d933071
+MODIFIED_FILE: src/app/(tabs)/alerts.tsx
+MODIFIED_HASH_SHA256: 3d6bc16102a44722c8fdfe3823079f78a122ba7777883b18194290335c293e85
