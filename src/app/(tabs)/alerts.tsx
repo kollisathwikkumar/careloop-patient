@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useState, type JSX } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { DEFAULT_APPOINTMENT, isAppointmentChanged, loadAppointment, type AppointmentSchedule } from '@/lib/appointment';
 
 type AlertKind =
   | 'upcoming'
@@ -21,6 +22,13 @@ type NotificationRow = {
   date: string;
   category: Exclude<AlertFilter, 'all'>;
   accent: string;
+};
+
+const ALERT_SOURCES: Record<AlertFilter, number> = {
+  all: require('@/assets/images/careloop/alerts-app.png'),
+  appointments: require('@/assets/images/careloop/alerts-appointments-app.png'),
+  updates: require('@/assets/images/careloop/alerts-updates-app.png'),
+  reminders: require('@/assets/images/careloop/alerts-reminders-app.png'),
 };
 
 const FILTERED_NOTIFICATIONS: readonly NotificationRow[] = [
@@ -74,12 +82,6 @@ const FILTERED_NOTIFICATIONS: readonly NotificationRow[] = [
   },
 ];
 
-const FILTERED_SOURCES: Record<Exclude<AlertFilter, 'all'>, number> = {
-  appointments: require('@/assets/images/careloop/alerts-appointments-reference-v2.png'),
-  updates: require('@/assets/images/careloop/alerts-updates-reference-v2.png'),
-  reminders: require('@/assets/images/careloop/alerts-reminders-reference-v2.png'),
-};
-
 function AlertHotspot({
   accessibilityLabel,
   onPress,
@@ -92,9 +94,72 @@ function AlertHotspot({
   return <Pressable accessibilityLabel={accessibilityLabel} accessibilityRole="button" onPress={onPress} style={[styles.hotspot, style]} />;
 }
 
+function AlertBackground({ filter }: { filter: AlertFilter }): JSX.Element {
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View style={[StyleSheet.absoluteFill, styles.opaqueBackground]} />
+      <Image key={`alert-background-${filter}`} accessibilityLabel={filter === 'all' ? 'CareLoop alerts' : 'CareLoop filtered alerts'} contentFit="fill" source={ALERT_SOURCES[filter]} style={StyleSheet.absoluteFill} />
+    </View>
+  );
+}
+
+function BackToHomeButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable accessibilityLabel="Back to Home" accessibilityRole="button" onPress={onPress} style={styles.backButton}>
+      <Text style={styles.backChevron}>‹</Text>
+    </Pressable>
+  );
+}
+
+function AlertsHeader({ onBack }: { onBack: () => void }) {
+  return (
+    <>
+      <View pointerEvents="none" style={styles.headerMask} />
+      <View pointerEvents="box-none" style={styles.header}>
+        <BackToHomeButton onPress={onBack} />
+        <View pointerEvents="none" style={styles.headerCopy}>
+          <Text style={styles.headerTitle}>Alerts</Text>
+          <Text style={styles.headerSubtitle}>Stay updated on your appointments{`\n`}and care journey.</Text>
+        </View>
+      </View>
+    </>
+  );
+}
+
+function UpdatedAlertAppointment({ appointment }: { appointment: AppointmentSchedule }): JSX.Element | null {
+  if (!isAppointmentChanged(appointment)) {
+    return null;
+  }
+
+  return (
+    <View pointerEvents="none" style={styles.updatedAlertLayer}>
+      <View style={styles.updatedAlertTimeMask}>
+        <Text style={styles.updatedAlertTime}>{appointment.time}</Text>
+      </View>
+      <View style={styles.updatedAlertBodyMask}>
+        <Text style={styles.updatedAlertBody}>{appointment.status === 'confirmed' ? `Appointment confirmed for ${appointment.date}.` : `Reschedule requested for ${appointment.date}.`}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function AlertsScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<AlertFilter>('all');
+  const [appointment, setAppointment] = useState<AppointmentSchedule>(DEFAULT_APPOINTMENT);
+
+  useEffect(() => {
+    let active = true;
+    void loadAppointment().then((loadedAppointment) => {
+      if (active) {
+        setAppointment(loadedAppointment);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const openAlert = (kind: AlertKind): void => {
     router.push({ pathname: '/alert-detail', params: { type: kind } });
@@ -110,7 +175,9 @@ export default function AlertsScreen() {
     return (
       <View style={styles.screen}>
         <StatusBar hidden />
-        <Image accessibilityLabel="CareLoop filtered alerts" contentFit="fill" source={FILTERED_SOURCES[filter]} style={StyleSheet.absoluteFill} />
+        <AlertBackground filter={filter} />
+        {filter === 'appointments' ? <UpdatedAlertAppointment appointment={appointment} /> : null}
+        <AlertsHeader onBack={() => router.replace('/home')} />
         <AlertHotspot accessibilityLabel="Mark all read" onPress={() => Alert.alert('Alerts', 'All alerts are marked as read.')} style={styles.markReadHotspot} />
         <AlertHotspot accessibilityLabel="All alerts filter" onPress={() => showFilter('all')} style={styles.allFilterHotspot} />
         <AlertHotspot accessibilityLabel="Appointments filter" onPress={() => showFilter('appointments')} style={styles.appointmentsFilterHotspot} />
@@ -137,12 +204,9 @@ export default function AlertsScreen() {
   return (
     <View style={styles.screen}>
       <StatusBar hidden />
-      <Image
-        accessibilityLabel="CareLoop alerts"
-        contentFit="fill"
-        source={require('@/assets/images/careloop/alerts-reference.png')}
-        style={StyleSheet.absoluteFill}
-      />
+      <AlertBackground filter="all" />
+      <UpdatedAlertAppointment appointment={appointment} />
+      <AlertsHeader onBack={() => router.replace('/home')} />
       <AlertHotspot accessibilityLabel="Mark all read" onPress={() => Alert.alert('Alerts', 'All alerts are marked as read.')} style={styles.markReadHotspot} />
       <AlertHotspot accessibilityLabel="All alerts filter" onPress={() => showFilter('all')} style={styles.allFilterHotspot} />
       <AlertHotspot accessibilityLabel="Appointments filter" onPress={() => showFilter('appointments')} style={styles.appointmentsFilterHotspot} />
@@ -166,7 +230,15 @@ export default function AlertsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
+  opaqueBackground: { backgroundColor: '#FFFFFF' },
   hotspot: { position: 'absolute', backgroundColor: 'transparent' },
+  headerMask: { backgroundColor: '#FFFFFF', height: '11.8%', left: 0, position: 'absolute', top: '4.2%', width: '72%', zIndex: 2 },
+  header: { height: '11.8%', left: 0, position: 'absolute', right: 0, top: '4.2%', zIndex: 3 },
+  backButton: { alignItems: 'center', height: 38, justifyContent: 'center', left: '3%', position: 'absolute', top: 0, width: '8%' },
+  backChevron: { color: '#0A376E', fontSize: 38, fontWeight: '300', lineHeight: 38 },
+  headerCopy: { left: '13%', position: 'absolute', right: '28%', top: 0 },
+  headerTitle: { color: '#0A376E', fontSize: 22, fontWeight: '800', lineHeight: 28 },
+  headerSubtitle: { color: '#6580A3', fontSize: 15, lineHeight: 22, marginTop: 1 },
   markReadHotspot: { right: '3%', top: '5%', width: '27%', height: '7%' },
   allFilterHotspot: { left: '4%', top: '16%', width: '17%', height: '6%' },
   appointmentsFilterHotspot: { left: '22%', top: '16%', width: '29%', height: '6%' },
@@ -181,4 +253,9 @@ const styles = StyleSheet.create({
   bottomNav: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '10%', flexDirection: 'row' },
   navHotspot: { position: 'relative', flex: 1, height: '100%' },
   filteredCardHotspot: { left: '4%', right: '3%', height: '11%' },
+  updatedAlertLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 1 },
+  updatedAlertTimeMask: { alignItems: 'flex-end', backgroundColor: '#FFFFFF', borderRadius: 8, height: '4.8%', justifyContent: 'center', paddingHorizontal: 4, position: 'absolute', right: '8%', top: '25.2%', width: '30%' },
+  updatedAlertTime: { color: '#6580A3', fontSize: 13, fontWeight: '700', textAlign: 'right' },
+  updatedAlertBodyMask: { backgroundColor: '#FFFFFF', borderRadius: 8, left: '20%', minHeight: '9.2%', justifyContent: 'center', paddingHorizontal: 4, position: 'absolute', top: '27.8%', width: '62%' },
+  updatedAlertBody: { color: '#6580A3', fontSize: 13, lineHeight: 20 },
 });

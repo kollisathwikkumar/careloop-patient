@@ -70,7 +70,7 @@ function CareLoopLogo({ compact = false }: { compact?: boolean }) {
 function WaveBackdrop({ children }: { children: ReactNode }) {
   return (
     <View style={styles.backdrop}>
-      <StatusBar style="dark" />
+      <StatusBar hidden />
       <View style={styles.softGlowTop} />
       <View style={styles.softGlowRight} />
       <View style={styles.waveOne} />
@@ -244,7 +244,7 @@ function ConnectionCodeScreen({ onBack, onContinue }: { onBack: () => void; onCo
 function PlainScreen({ children }: { children: ReactNode }) {
   return (
     <View style={styles.plainBackdrop}>
-      <StatusBar style="dark" />
+      <StatusBar hidden />
       {children}
     </View>
   );

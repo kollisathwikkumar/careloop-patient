@@ -1,12 +1,64 @@
-CHANGED_BRANCH: alerts-reference
+GIT_BRANCH: main
+CHANGED_BRANCH: main
 CHANGED_FIELDS:
-- src/app/(tabs)/alerts.tsx -> keeps the All screen pixel-identical and switches filter states to the same reference-derived card, icon, spacing, typography, chip, and bottom-navigation treatment.
-- assets/images/careloop/alerts-appointments-reference-v2.png -> reference-derived Appointments filter with Upcoming appointment, Appointment confirmed, and Appointment rescheduled.
-- assets/images/careloop/alerts-updates-reference-v2.png -> reference-derived Updates filter with Message from care team and Care plan updated.
-- assets/images/careloop/alerts-reminders-reference-v2.png -> reference-derived Reminders filter with Reminder.
-- src/app/(tabs)/alert-detail.tsx -> retains functional notification detail pages.
-- src/app/(tabs)/home.tsx and src/app/(tabs)/journey.tsx -> retain Alerts navigation.
-- DIFF_FILE, VERIFICATION.txt, ROLLBACK.sh -> verification and rollback artifacts retained and updated.
+- src/app/(tabs)/alerts.tsx -> filter rendering now uses the correct app artwork for All, Appointments, Updates, and Reminders, with a forced image remount and opaque white backing so stale artwork cannot remain visible.
+- src/app/(tabs)/alerts.tsx -> Appointments exposes only Upcoming appointment, Appointment confirmed, and Appointment rescheduled; Updates exposes only Message from care team and Care plan updated; Reminders exposes only Reminder; All restores all six alerts.
+- src/app/(tabs)/alerts.tsx -> the persisted appointment overlay is applied only to All/Appointments, so it no longer overwrites Reminder or Updates copy.
+- src/app/(tabs)/home.tsx -> “I’ll attend” remains a direct Home-dashboard confirmation with AsyncStorage persistence and confirmation message.
+- src/app/(tabs)/journey.tsx -> confirmed custom date/time remains synchronized.
+- src/app/(tabs)/alert-detail.tsx -> confirmed/rescheduled detail remains synchronized.
+- src/lib/appointment.ts -> typed AsyncStorage appointment state remains the shared source of truth.
+- ROLLBACK.sh -> restores tracked source files and removes derived appointment assets in an isolated copy.
 
-MODIFIED_FILE: src/app/(tabs)/alerts.tsx
-MODIFIED_HASH_SHA256: 3d6bc16102a44722c8fdfe3823079f78a122ba7777883b18194290335c293e85
+MODIFIED_FILE: /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/alerts.tsx
+MODIFIED_HASH_SHA256: 665f7a068c769442706cb333a4aeeb9555cc8e4f107aedc9852d248a7e0c8e7b
+
+ARTIFACTS:
+MODIFIED_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/alerts.tsx
+DIFF_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/DIFF_FILE
+VERIFICATION_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/VERIFICATION.txt
+ROLLBACK_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/ROLLBACK.sh
+
+BASELINE_COMMAND: npx tsc --noEmit
+BASELINE_INPUT: copied the current tree while replacing index.tsx, Home, Journey, Alerts, and alert-detail.tsx with their HEAD versions; auxiliary assets were retained.
+BASELINE_LITERAL_OUTPUT: [empty]
+BASELINE_RESULT: exit 0
+
+MODIFIED_COMMAND: npx tsc --noEmit
+MODIFIED_INPUT: current tree with working All/Appointments/Updates/Reminders filters and persisted appointment overlays.
+MODIFIED_LITERAL_OUTPUT: [empty]
+MODIFIED_RESULT: exit 0
+
+DIFF_CHECK_COMMAND: git diff --check
+DIFF_CHECK_INPUT: current working-tree changes.
+DIFF_CHECK_LITERAL_OUTPUT: [empty]
+DIFF_CHECK_RESULT: exit 0
+
+LINT_COMMAND: npm run lint
+LINT_INPUT: current CareLoopPatient source.
+LINT_LITERAL_OUTPUT:
+> carelooppatient@1.0.0 lint
+> expo lint
+
+env: load .env.local
+env: export EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY EXPO_PUBLIC_SUPABASE_URL
+
+/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/hooks/use-color-scheme.web.ts
+  11:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+✖ 1 problem (1 error, 0 warnings)
+LINT_RESULT: exit 1; one existing lint error remains outside the changed files.
+
+ROLLBACK_COMMAND: TARGET_ROOT="/tmp/careloop-rollback-alerts.vD0f3l" "/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/ROLLBACK.sh"
+ROLLBACK_INPUT: isolated copy of the current source tree.
+ROLLBACK_LITERAL_OUTPUT: rollback copy restored
+ROLLBACK_RESULT: exit 0; isolated assertions exit 0, tracked source hashes matched HEAD, src/lib/appointment.ts was removed, and working files retained the changes.
+
+SIMULATOR_VERIFICATION:
+- Current bundle opened with exp://127.0.0.1:8085/--/alerts.
+- Appointments: AX showed Upcoming appointment, Appointment confirmed, Appointment rescheduled; screenshot showed the three appointment cards.
+- Updates: AX showed Message from care team and Care plan updated; screenshot showed the two update cards.
+- Reminders: AX showed Reminder; screenshot showed only the reminder card with its original 8:00 AM/document copy.
+- All: AX restored Upcoming appointment, Appointment confirmed, Reminder, Appointment rescheduled, Message from care team, and Care plan updated.
+
+STATUS: all four alert filters are functional and visually switch to the correct artwork; TypeScript passes; diff check passes; lint has one existing unrelated error.

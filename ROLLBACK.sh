@@ -1,20 +1,25 @@
 #!/bin/zsh
 set -euo pipefail
 
-ROOT="${TARGET_ROOT:-.}"
-INDEX="$ROOT/src/app/index.tsx"
+SCRIPT_DIR="${0:A:h}"
+ROOT="${TARGET_ROOT:-$SCRIPT_DIR}"
 
-python3 - "$INDEX" <<'PY'
-from pathlib import Path
-import sys
+RESTORE_FILES=(
+  "src/app/index.tsx"
+  "src/app/(tabs)/home.tsx"
+  "src/app/(tabs)/journey.tsx"
+  "src/app/(tabs)/alerts.tsx"
+  "src/app/(tabs)/alert-detail.tsx"
+)
 
-path = Path(sys.argv[1])
-text = path.read_text()
-text = text.replace("logo-lockup-transparent.png", "logo-lockup.png")
-text = text.replace("splash-lockup-transparent.png", "splash-lockup.png")
-path.write_text(text)
-PY
+for file in "${RESTORE_FILES[@]}"; do
+  mkdir -p "$ROOT/$(dirname "$file")"
+  git -C "$SCRIPT_DIR" show "HEAD:$file" > "$ROOT/$file"
+done
 
+rm -f "$ROOT/src/lib/appointment.ts"
+rm -f "$ROOT/assets/images/careloop/"*-app.png
 rm -f "$ROOT/assets/images/careloop/logo-lockup-transparent.png"
 rm -f "$ROOT/assets/images/careloop/splash-lockup-transparent.png"
+
 print "rollback copy restored"

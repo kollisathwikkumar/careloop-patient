@@ -1,5 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState, type JSX } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { DEFAULT_APPOINTMENT, isAppointmentChanged, loadAppointment, type AppointmentSchedule } from '@/lib/appointment';
 
 type AlertKind = 'upcoming' | 'confirmed' | 'reminder' | 'rescheduled' | 'message' | 'care-plan';
 
@@ -83,19 +85,58 @@ function getDetailKind(value: string | string[] | undefined): AlertKind {
   return 'upcoming';
 }
 
+function getDetailContent(kind: AlertKind, appointment: AppointmentSchedule): DetailContent {
+  const detail = DETAILS[kind];
+  if ((!isAppointmentChanged(appointment) && appointment.status !== 'reschedule-requested') || (kind !== 'upcoming' && kind !== 'rescheduled')) {
+    return detail;
+  }
+
+  if (kind === 'upcoming') {
+    return {
+      ...detail,
+      date: `${appointment.date} · ${appointment.time}`,
+      body: appointment.status === 'confirmed' ? 'Your follow-up visit is confirmed.' : 'Your reschedule request is with the care team for confirmation.',
+      sections: [
+        { heading: 'Requested appointment', text: `${appointment.date} · ${appointment.time}` },
+        { heading: 'Status', text: appointment.status === 'confirmed' ? 'Confirmed' : 'Reschedule requested' },
+        { heading: 'Doctor', text: 'Dr. K. Sathwik' },
+      ],
+    };
+  }
+
+  return {
+    ...detail,
+    date: `${appointment.date} · ${appointment.time}`,
+    body: appointment.status === 'confirmed' ? 'Your requested appointment time is confirmed.' : 'Your requested appointment time has been sent to the care team.',
+    sections: [{ heading: 'Requested appointment', text: `${appointment.date} · ${appointment.time}` }, { heading: 'Status', text: appointment.status === 'confirmed' ? 'Confirmed' : 'Awaiting confirmation' }],
+  };
+}
+
 export default function AlertDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ type?: string }>();
-  const detail = DETAILS[getDetailKind(params.type)];
+  const [appointment, setAppointment] = useState<AppointmentSchedule>(DEFAULT_APPOINTMENT);
+  const kind = getDetailKind(params.type);
+  const detail = getDetailContent(kind, appointment);
+
+  useEffect(() => {
+    let active = true;
+    void loadAppointment().then((loadedAppointment) => {
+      if (active) {
+        setAppointment(loadedAppointment);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Pressable accessibilityLabel="Back to Alerts" accessibilityRole="button" onPress={() => router.replace('/alerts')} style={styles.backButton}>
-          <Text style={styles.backIcon}>‹</Text>
-          <Text style={styles.backText}>Alerts</Text>
-        </Pressable>
+        <BackArrowButton onPress={() => router.replace('/alerts')} />
         <View style={[styles.icon, { backgroundColor: `${detail.accent}18` }]}>
           <View style={[styles.iconDot, { backgroundColor: detail.accent }]} />
         </View>
@@ -121,11 +162,27 @@ export default function AlertDetailScreen() {
   );
 }
 
+function BackArrowButton({ onPress }: { onPress: () => void }): JSX.Element {
+  return (
+    <Pressable accessibilityLabel="Back to Alerts" accessibilityRole="button" onPress={onPress} style={styles.backButton}>
+      <View style={styles.backArrow}>
+        <View style={styles.backArrowHeadTop} />
+        <View style={styles.backArrowHeadBottom} />
+        <View style={styles.backArrowStem} />
+      </View>
+      <Text style={styles.backText}>Alerts</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FBFF' },
   content: { paddingHorizontal: 24, paddingTop: 58, paddingBottom: 36 },
   backButton: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 8, marginBottom: 40 },
-  backIcon: { color: '#0A376E', fontSize: 36, fontWeight: '300', lineHeight: 36 },
+  backArrow: { height: 24, marginRight: 2, position: 'relative', width: 24 },
+  backArrowHeadTop: { backgroundColor: '#0A376E', height: 2.5, left: 3, position: 'absolute', top: 7, transform: [{ rotate: '-45deg' }], width: 11 },
+  backArrowHeadBottom: { backgroundColor: '#0A376E', height: 2.5, left: 3, position: 'absolute', top: 14, transform: [{ rotate: '45deg' }], width: 11 },
+  backArrowStem: { backgroundColor: '#0A376E', height: 2.5, left: 7, position: 'absolute', top: 10.7, width: 16 },
   backText: { color: '#0A376E', fontSize: 17, fontWeight: '600' },
   icon: { alignItems: 'center', borderRadius: 38, height: 76, justifyContent: 'center', marginBottom: 22, width: 76 },
   iconDot: { borderRadius: 14, height: 28, width: 28 },
