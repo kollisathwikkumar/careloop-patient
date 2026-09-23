@@ -1,0 +1,37 @@
+CHANGED_BRANCH: careloop-full-platform-requirements
+CHANGED_FIELDS: New full-stack CareLoop product requirements and build plan covering doctor/staff registration and profiles, duplicate-email behavior, generated staff codes, roles and permissions, patient groups/allocation, individually named test/report uploads, medication records, care plans, appointments, follow-up queues, secure QR pairing, shared dashboard/mobile data, acceptance criteria, and phased implementation.
+SOURCE_REFERENCE: Screenshot 2026-09-23 at 7.46.50 PM.png; SHA256 preserved as 5f8b399749bfc11eb0578651096752d285c707df3229f57f5bba4e65eb3cec4d.
+
+ARTIFACTS:
+MODIFIED_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/specs/careloop-follow-up/CARELOOP_FULL_PLATFORM_REQUIREMENTS.md
+DIFF_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/specs/careloop-follow-up/DIFF_FILE
+VERIFICATION_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/specs/careloop-follow-up/VERIFICATION.txt
+ROLLBACK_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/specs/careloop-follow-up/ROLLBACK.sh
+
+BASELINE_COMMAND: target='specs/careloop-follow-up/CARELOOP_FULL_PLATFORM_REQUIREMENTS.md'; if [[ -e "$target" ]]; then printf 'BASELINE_TARGET_ALREADY_EXISTS\n'; exit 1; else printf 'BASELINE_TARGET_ABSENT\n'; fi; shasum -a 256 '/var/folders/fl/lnjp_zdn4gx91kqh0p5vpvh40000gn/T/TemporaryItems/NSIRD_screencaptureui_omNo9H/Screenshot 2026-09-23 at 7.46.50 PM.png'
+BASELINE_INPUT: Target Markdown path before creation was absent; reference screenshot bytes were hashed without modification.
+BASELINE_LITERAL_OUTPUT:
+BASELINE_TARGET_ABSENT
+5f8b399749bfc11eb0578651096752d285c707df3229f57f5bba4e65eb3cec4d  /var/folders/fl/lnjp_zdn4gx91kqh0p5vpvh40000gn/T/TemporaryItems/NSIRD_screencaptureui_omNo9H/Screenshot 2026-09-23 at 7.46.50 PM.png
+BASELINE_RESULT: exit 0
+
+MODIFIED_COMMAND: python3 -c 'from pathlib import Path; p=Path("specs/careloop-follow-up/CARELOOP_FULL_PLATFORM_REQUIREMENTS.md"); t=p.read_text(); required=["# CareLoop — Full-Platform Requirements & Build Plan", "## 4. Account registration, profile setup, and login", "## 5. Dashboard information architecture", "## 6. Patient groups, allocation, and patient record", "## 7. Test and report entry/upload requirements", "## 8. Medication record requirements", "## 9. Care plans, appointments, and follow-up operations", "## 10. QR connection and patient-app workflow", "## 16. End-to-end acceptance criteria", "## 17. Recommended implementation sequence", "Gender (optional", "Years of experience", "unique email", "single-use", "exact test name", "CareLoop is a shared continuity-of-care workspace", "due, overdue, and unresolved follow-ups"]; missing=[x for x in required if x not in t]; major=sum(line.startswith("## ") for line in t.splitlines()); assert not missing, missing; assert major >= 18; assert p.stat().st_size > 15000; print(f"PASS: {len(required)} required content checks; {major} major sections; {p.stat().st_size} bytes")'
+MODIFIED_INPUT: Full Markdown requirements file; 17 required title/section/content markers; at least 18 major sections; size greater than 15,000 bytes.
+MODIFIED_LITERAL_OUTPUT: PASS: 17 required content checks; 20 major sections; 33468 bytes
+MODIFIED_RESULT: exit 0
+
+DIFF_COMMAND: python3 -c 'from pathlib import Path; patch=Path("specs/careloop-follow-up/DIFF_FILE").read_text(); doc=Path("specs/careloop-follow-up/CARELOOP_FULL_PLATFORM_REQUIREMENTS.md").read_text(); assert patch.startswith("--- /dev/null\n+++ specs/careloop-follow-up/CARELOOP_FULL_PLATFORM_REQUIREMENTS.md\n"); assert doc.splitlines()[0] in patch; print(f"PASS: unified new-file diff reopens and references {len(doc.splitlines())} document lines")'
+DIFF_INPUT: Reopened new-file unified diff and modified Markdown file; asserted expected headers and document-title inclusion.
+DIFF_LITERAL_OUTPUT: PASS: unified new-file diff reopens and references 434 document lines
+DIFF_RESULT: exit 0
+
+ROLLBACK_COMMAND: TARGET_ROOT="/tmp/careloop-rollback-QdFrHq" specs/careloop-follow-up/ROLLBACK.sh
+ROLLBACK_INPUT: A separate temporary copy of MODIFIED_FILE at /tmp/careloop-rollback-QdFrHq/CARELOOP_FULL_PLATFORM_REQUIREMENTS.md; expected SHA256 d2e4dc6f1aed2140815c0562a0c9ac143359b1412ec14ad3576e6d0b5662596e.
+ROLLBACK_LITERAL_OUTPUT:
+ROLLBACK_FIXTURE_COPY=/tmp/careloop-rollback-QdFrHq/CARELOOP_FULL_PLATFORM_REQUIREMENTS.md
+rollback copy restored baseline (new document removed): /tmp/careloop-rollback-QdFrHq/CARELOOP_FULL_PLATFORM_REQUIREMENTS.md
+PASS: rollback copy absent; working document unchanged
+ROLLBACK_RESULT: exit 0
+RESTORED_BEHAVIOR_STATUS: The rollback fixture returned to the baseline state (new target absent, exit 0). The real MODIFIED_FILE remains present and unchanged with SHA256 d2e4dc6f1aed2140815c0562a0c9ac143359b1412ec14ad3576e6d0b5662596e.
+
+REOPEN_RESULT: MODIFIED_FILE, DIFF_FILE, VERIFICATION_FILE, and executable ROLLBACK_FILE were created and reopened. The referenced screenshot hash remains 5f8b399749bfc11eb0578651096752d285c707df3229f57f5bba4e65eb3cec4d.

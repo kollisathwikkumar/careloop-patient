@@ -1,0 +1,437 @@
+--- /dev/null
++++ specs/careloop-follow-up/CARELOOP_FULL_PLATFORM_REQUIREMENTS.md
+@@ -0,0 +1,434 @@
++# CareLoop — Full-Platform Requirements & Build Plan
++
++**Product:** CareLoop  
++**Use case:** Patient Follow-up & Continuity of Care (Use case 01 of 07)  
++**Document type:** Product requirements, workflow specification, and implementation handoff  
++**Status:** Draft baseline for design and engineering  
++**Primary clients:** Care-team web dashboard and patient iOS/Android application
++
++> **Product promise:** Keep patients connected across months of care. Help care teams see who needs a follow-up, understand the next action, and close the loop before a patient is lost to care.
++
++---
++
++## 1. Executive summary
++
++CareLoop is a shared continuity-of-care workspace. Doctors, nurses, care coordinators, receptionists, laboratory staff, and administrators use a role-aware web dashboard to manage patients allocated to their clinic or care team. Patients use a mobile app to connect to their care team, see the information shared with them, review upcoming visits, and respond to follow-up requests.
++
++The dashboard must be a **working application, not a static image, prototype, or collection of empty screens**. Users need to create, read, update, and, where permitted, archive real records through validated forms. Saved changes must be persisted in the shared backend and reflected in the appropriate dashboard and patient-app views. Every page must have a useful loading, empty, error, and populated state; no dead buttons, fake success messages, unexplained blank panels, or hard-coded patient records in production.
++
++The core operating loop is:
++
++1. A staff member registers or imports a patient and assigns a care team.
++2. An authorized doctor or staff member creates a short-lived QR invitation.
++3. The patient scans the QR in the CareLoop app, verifies their account, reviews the clinic/doctor identity, and confirms the connection.
++4. The care team records encounters, individually named tests/reports, medication entries, care plans, appointments, and follow-up tasks.
++5. The team sees due, overdue, and unresolved follow-ups in an actionable work queue.
++6. Approved updates appear in the patient app; patient responses return to the dashboard.
++7. The team records the outcome and schedules the next step, maintaining a traceable care journey.
++
++CareLoop supports care coordination and recordkeeping. It does not autonomously diagnose, interpret test results, prescribe medication, or replace a clinician's judgment.
++
++## 2. Problem and outcome
++
++### Current reality
++
++Long-term care for conditions such as cancer, diabetes, and maternal health can span months or years. Appointment systems, EMRs, laboratories, treatment registers, spreadsheets, and manual trackers often hold fragmented pieces of the journey. Teams spend time finding patients who need action, coordinating departments, and re-engaging people after missed visits or investigations. Growing patient volumes make manual follow-up difficult to sustain.
++
++### Intended outcome
++
++CareLoop should make the next operational action visible and assignable, connect patient information across the care team, and help staff act on missed or upcoming milestones in time. It should reduce avoidable gaps by improving visibility, coordination, and patient engagement without making automated clinical decisions.
++
++### Product success measures
++
++The pilot should establish baselines and then measure:
++
++- Percentage of due follow-ups reviewed and assigned an owner.
++- Percentage of patients contacted after a missed appointment within the clinic's configured service window.
++- Follow-up completion and reschedule-request closure rates.
++- Median time from a report upload to clinician review.
++- QR invitation completion rate and time to successful connection.
++- Percentage of records with an assigned responsible care team.
++- Patient notification delivery and response rates.
++- Data-entry completeness, duplicate-patient rate, and unresolved sync failures.
++
++Targets must be agreed with the pilot clinic after baseline measurement; do not invent performance claims before collecting pilot data.
++
++## 3. Users, organizations, and access model
++
++### Supported roles
++
++| Role | Core responsibilities | Typical access |
++|---|---|---|
++| Organization administrator | Configure organization, locations, users, teams, role templates, and audit review | Organization configuration; patient-content access only when separately granted |
++| Doctor / clinician | Review assigned patients, document encounters, manage clinician-owned care plans and medication records, review reports, and set follow-ups | Assigned patients and clinically permitted fields |
++| Nurse | Record permitted observations and care activities, coordinate patient follow-ups, and escalate to a clinician | Assigned patients and nurse-permitted fields |
++| Care coordinator / case manager | Track milestones, contact patients, coordinate departments, and close follow-up tasks | Assigned groups and coordination fields; clinical edits limited by policy |
++| Receptionist / scheduling staff | Maintain permitted demographics, schedule visits, record attendance, and process reschedule requests | Scheduling and administrative fields for assigned clinic patients |
++| Laboratory / records staff | Upload or reconcile test/report records and route them for review | Laboratory/report functions for assigned organization; no unrelated clinical access |
++| Patient | View own shared records, care-team details, appointments, and follow-up requests; submit responses | Own account and explicitly shared information only |
++
++An organization may configure additional job titles, but permissions must map to explicit capabilities. A displayed job title alone must never grant access.
++
++### Permission requirements
++
++- Enforce permissions on the server/database for every read and write; hiding a button in the web UI is not authorization.
++- Scope staff access to organization, location, assigned care team, and allocated patients.
++- Default to least privilege. Separate account administration, clinical editing, report review, scheduling, and audit permissions.
++- Record who created, viewed where required, changed, reviewed, shared, or archived a sensitive record and when.
++- Revoke access promptly when an account is disabled or a team assignment ends.
++- Prevent one organization from accessing another organization's records.
++- Give patients access only to their own account and records marked for patient sharing.
++
++## 4. Account registration, profile setup, and login
++
++### Staff/doctor onboarding flow
++
++1. **Welcome:** Show CareLoop branding and clear choices for staff sign-in and account registration. Patient app onboarding is a separate flow.
++2. **Create account:** Collect full name, work email, mobile number, and password. Verify email and/or the organization's chosen identity method before granting access.
++3. **Duplicate email check:** Enforce a unique normalized email address at the identity/database layer. If it is already registered, block creating a second account and offer “Log in” and “Reset password.” Never create duplicate staff identities.
++4. **Request role:** Let the applicant select the requested role (doctor, nurse, care coordinator, receptionist, laboratory/records staff, or other configured role) and organization/location. Requested role is not self-authorizing.
++5. **Role-specific profile:** Display only the relevant profile form. Require professional/employee details appropriate to the role and clinic.
++6. **Generate unique code:** After a valid profile is submitted, generate a non-guessable unique staff/doctor identifier (for example, `CL-ORG-7K4P2D`). Enforce uniqueness server-side. This code is an identifier, not a password or access token.
++7. **Review and activation:** Put new accounts into pending approval when the organization requires it. An authorized administrator verifies the request, assigns permission groups and patient teams, and activates the account.
++8. **Completion:** Show the generated staff code, account status, organization, and next steps. Never expose private credentials in email or in the dashboard.
++
++### Login behavior (important clarification)
++
++A previously registered email must be blocked from **sign-up**, not from valid **login**. Login must accept an existing verified, active email account only when the credentials are correct. An unknown email, wrong password, unverified account, disabled account, or pending approval must receive an appropriate non-revealing next step. Provide password reset, email verification, sign-out, and session revocation. Do not disclose whether an arbitrary email belongs to an account in public recovery responses.
++
++### Doctor profile fields
++
++Use the supplied “My Doctor” screen as a profile-content reference. Provide editable fields and show the saved values, not sample placeholders:
++
++- Profile photo (optional; show initials fallback if absent).
++- Full name and display title.
++- Qualifications/credentials (for example, MBBS, MD) and professional registration identifier where applicable.
++- Specialization and optional sub-specialization.
++- Gender (optional; only collect if the organization has a defined need and use).
++- Date of birth only if required for the professional record; derive displayed age rather than separately storing inconsistent age text.
++- Years of experience.
++- Organization/hospital, department, location, and clinic contact details.
++- Work email and phone number.
++- Care-team membership and patient allocation summary.
++- Profile/connection status (pending, active, suspended, or disconnected).
++
++The patient-facing profile may show the clinician's name, qualifications, specialty, clinic, location, and approved contact method. Do not hard-code the example clinician or hospital shown in the reference image.
++
++### Staff profile fields
++
++- Full name, work email, verified phone, requested job title, department, organization/location, supervisor, and employment status.
++- Employee/staff code generated by the system.
++- Assigned role template and granular permission set managed by an administrator.
++- Optional professional registration fields when relevant to that role.
++
++## 5. Dashboard information architecture
++
++The web dashboard should provide persistent navigation, a clear organization/location context, user profile and help access, and responsive behavior for desktop and tablet. Suggested primary sections:
++
++1. **Overview** — operational summary and prioritized work queue.
++2. **Patients** — patient directory, groups, allocation, and patient record.
++3. **Follow-ups** — due, overdue, missed, unresolved, and completed follow-ups.
++4. **Appointments** — calendar, list, attendance, confirmations, and reschedule requests.
++5. **Reports & tests** — individually named test/report records and review queue.
++6. **Medications** — medication records associated with patient profiles and encounters.
++7. **Care plans** — milestones, goals entered by the care team, actions, owners, and review dates.
++8. **Tasks & communication** — contact attempts, patient responses, reminders, escalations, and assigned work.
++9. **QR connections** — create, inspect, revoke, and audit invitations.
++10. **Care teams** — clinicians, staff, groups, locations, and patient allocations.
++11. **Administration** — organization settings, users, role templates, notification settings, and audit log.
++
++### Overview dashboard
++
++Show operationally useful, filterable counts and queues, not decorative mock metrics:
++
++- Today's appointments and unconfirmed visits.
++- Follow-ups due today, overdue, or missing an owner.
++- Patients with a missed appointment or overdue investigation milestone.
++- Reports awaiting review.
++- Open reschedule requests and patient messages.
++- Recent changes and failed/pending synchronization events.
++
++Every summary card should open the corresponding filtered list. Each queue row should identify the patient, due date, reason/status, assigned owner, and one appropriate next action. Counts must be derived from persisted data and the selected date/time zone.
++
++## 6. Patient groups, allocation, and patient record
++
++### Patient directory and groups
++
++- Create patient groups by clinic, care team, program, or clinician, with organization-defined labels.
++- Provide an unassigned-patient queue and prevent a patient from silently disappearing when reassigned.
++- Assign a primary doctor and optional supporting team members; retain assignment history.
++- Search and filter by permitted fields, group, doctor, follow-up status, appointment status, report-review status, and last activity.
++- Support controlled patient merge/duplicate resolution with an audit trail; never merge solely on a name match.
++
++### Patient profile and record tabs
++
++**Profile & contacts**
++
++- System patient ID; full name; date of birth and derived age; preferred name; contact phone/email; preferred language and contact channel; address if needed; emergency/guardian contact if applicable; identity-verification state; consent/share preferences; current clinic, group, primary doctor, and supporting team.
++- Make demographic collection configurable by clinic. Do not require fields without an operational need.
++
++**Care overview**
++
++- Current status: active, needs contact, follow-up due, overdue, transferred, completed, or inactive.
++- Next appointment/milestone, responsible owner, last completed encounter, open tasks, and concise chronology.
++- Status must be based on explicit record events and configured dates, not an opaque risk score.
++
++**Encounters and notes**
++
++- Encounter date/time, visit type, location, author, note, follow-up action, visibility, and status.
++- Draft, signed/final, and amended states with author/time history; preserve the original finalized entry when amended.
++
++**Tests and reports**
++
++- Dedicated section with one clearly named test/report record per test or configured panel.
++- Upload each test individually, with an exact catalog/test name; do not save a report under a vague catch-all label when a specific test is known.
++
++**Medication list**
++
++- Medication records entered or confirmed by an authorized clinician. See Section 8.
++
++**Appointments, care plan, and follow-ups**
++
++- Linked operational records with full history and clear next action.
++
++## 7. Test and report entry/upload requirements
++
++### Individual test form
++
++Each test entry must support:
++
++- Exact test name selected from a clinic-managed searchable catalog; allow an authorized custom name with a required display name and category.
++- Test category (configurable), ordered/performed date and time, ordering clinician, performing facility/lab, and source.
++- Result value or textual result, units, and reference interval when relevant; fields vary by test type.
++- Result state: ordered, collected, processing, resulted, reviewed, amended, or cancelled.
++- One or more attachments with file name, MIME/type, upload time, and uploader; validate permitted file types and size.
++- Clinician review status, reviewer, review time, and a note.
++- Patient-sharing state and date made visible.
++- Link to the related encounter, care plan milestone, and follow-up task where applicable.
++
++A combined laboratory panel may be represented by a configured panel plus its component results. Preserve the original lab document and record which named tests it supports. Prevent accidental duplicate uploads with a warning and review flow rather than silently discarding a legitimate repeat test.
++
++### Reports list and review queue
++
++- Show exact test/report name, patient, performed date, result state, upload source, reviewer state, and next action.
++- Filter by awaiting review, date, test category, clinic, clinician, and patient group.
++- Allow authorized users to mark reviewed, request correction, attach an amended version, or share with the patient.
++- Display version history and never overwrite the original file invisibly.
++- Patient app shows only records explicitly marked as patient-visible; report visibility does not imply automated interpretation.
++
++## 8. Medication record requirements
++
++A patient medication entry should include, when applicable:
++
++- Medication name and catalog identifier; brand/generic name where available.
++- Strength, dose/instructions, route, frequency, and timing.
++- Start date, expected end/review date, and status (active, paused, completed, discontinued, or historical).
++- Prescribing/confirming clinician, source encounter, and last-reviewed timestamp.
++- Patient-facing instructions entered by the authorized clinician.
++- Change reason and history for edits, holds, or discontinuation.
++
++The interface records clinician-entered information; it must not independently recommend a dose, start/stop a drug, or infer changes from a report. Prominent stale-data and “verify with care team” states should be available where medication information has not recently been reviewed.
++
++## 9. Care plans, appointments, and follow-up operations
++
++### Care plan
++
++- Plan title, patient, responsible clinician/team, start/review dates, status, and patient-sharing state.
++- Individually tracked goals/milestones with description, due date, owner, completion evidence/status, and next action.
++- Link each milestone to relevant appointments, tests, reports, and tasks.
++- Keep versions and record who changed the plan and when.
++
++### Appointment
++
++- Patient, clinic/location, appointment type, primary clinician/team, date/time/time zone, duration if needed, visit purpose, status, instructions, and created-by metadata.
++- Statuses: proposed, scheduled, confirmation requested, confirmed, reschedule requested, rescheduled, checked in, completed, cancelled, or missed.
++- Reschedule requests record patient preference, request time, assigned handler, decision, final appointment, and notifications sent.
++- Prevent conflicting bookings according to the clinic's scheduling rules and show a clear conflict resolution state.
++
++### Follow-up work queue
++
++- Create a follow-up action from an appointment, report, care-plan milestone, or manual entry.
++- Store due date, reason, priority chosen by staff, assigned owner/team, contact method, attempt history, outcome, escalation, and next review date.
++- Surface overdue and missed events deterministically from configured dates/statuses.
++- Support outcomes such as reached, no answer, patient declined, rescheduled, completed, escalated, or unable to contact; allow an organization-configured list.
++- Every unresolved item must retain an owner or appear in an unassigned queue.
++- A completed action must record the outcome and, if more care is planned, create/link the next action.
++
++## 10. QR connection and patient-app workflow
++
++### Safe pairing flow
++
++1. An authorized dashboard user selects a patient record or creates a pending registration and chooses **Generate patient QR**.
++2. The backend creates a random, single-use, short-lived invitation bound to the intended organization and patient/registration context. The dashboard displays expiry and status.
++3. The patient signs into or verifies the mobile account, scans the QR, and sees the verified clinic/doctor profile, including approved name, credentials, specialization, hospital, location, and contact method.
++4. The patient confirms the correct care team and grants explicit connection consent.
++5. The backend validates the invitation, verifies patient identity/matching, consumes the token atomically, and creates an audited relationship.
++6. The app fetches only the records the patient is authorized to see. Dashboard and app show the connected state.
++
++QR content must be a pairing token or deep link only; it must not contain a full medical record, medication list, report, password, or permanent bearer credential. Handle expired, revoked, already-used, invalid, and wrong-patient invitations with clear recovery steps. Provide a manually entered short code as an accessible fallback. Allow authorized revocation and record all connection events.
++
++### Patient app content
++
++After connection, the app should display live, permission-filtered data from the shared backend:
++
++- Care-team profile and clinic-approved contact details.
++- Upcoming and previous appointments, confirmation state, and reschedule request flow.
++- Reports/tests explicitly shared with the patient, with exact test names, dates, and source documents.
++- Current clinician-approved medication records and care-plan instructions.
++- Follow-up milestones, reminders, and the next requested action.
++- Alerts for new shared information and appointment changes.
++
++The app must not claim that records were received or synchronized until the backend confirms the save. Show last-updated time and an actionable retry state for network failures.
++
++## 11. Forms, data quality, and “no blank spaces” requirement
++
++- Build every form as a real create/edit/view flow connected to persisted data.
++- Mark required and optional fields clearly; validate at entry and again on the server.
++- Use dropdown/search controls for controlled values such as role, clinic, test name, appointment status, and medication catalog where configured.
++- Use appropriate date/time controls, time-zone-aware storage, and human-readable local display.
++- Preserve drafts where the workflow allows; show saved, saving, failed, and retry states.
++- Use inline validation that names the field and explains how to correct it.
++- Never show empty white panels or unexplained blank fields. For missing optional values, show “Not provided” with an authorized edit action; for empty collections, show a useful message and a permitted **Add…** action.
++- Use a clear initials/image fallback instead of a broken profile image.
++- Do not fill production records with fictitious sample doctors, patients, reports, or metrics. Demo data must be clearly labelled and isolated from live data.
++- Use pagination or virtualization for long patient/report lists and preserve filters when users return from a record.
++- Make destructive actions confirmable and recoverable where possible; prefer archive/status changes over irreversible deletion.
++
++## 12. Notifications and communication
++
++- Generate in-app and, where configured, push/email/SMS notifications for appointment confirmations, reschedules, upcoming follow-ups, new patient-visible reports, and care-team requests.
++- Use a delivery log with event, destination channel, attempt state, timestamp, and retry outcome; do not expose sensitive report content in lock-screen notification text.
++- Let staff see whether a message is queued, sent, failed, or acknowledged where the channel supports it.
++- Make notification preferences and quiet-hour rules configurable by organization and patient.
++- Record patient responses as structured events visible in the relevant appointment or follow-up task.
++
++## 13. Data, integrations, and technical requirements
++
++- Use a shared, authoritative backend for web and mobile clients; avoid separate competing copies of patient data.
++- Use stable IDs, foreign-key relationships, timestamps, author IDs, organization IDs, and explicit status fields.
++- Enforce organization/team/patient access at the backend/database layer and test for cross-organization data leakage.
++- Use private file storage with authorization checks and expiring download links; do not publish report files as public URLs.
++- Keep credentials and privileged server keys out of browser bundles and mobile builds. Use server-side functions for privileged operations such as QR token creation/consumption and administrative provisioning.
++- Add concurrency/version handling so a stale form cannot silently overwrite a newer edit.
++- Provide audit logs for account/role changes, patient allocation, record creation/amendment, report access/review/sharing, QR lifecycle, appointment changes, and exports.
++- Start with structured manual entry and uploads. Design integration adapters for appointment systems, EMRs, lab systems, registers, and spreadsheets as later milestones; never imply an integration is live before it is configured, tested, and monitored.
++- Support backup/restore, retention configuration, incident logging, and documented export/deletion workflows appropriate to the deployment.
++
++## 14. UX, accessibility, and responsive behavior
++
++- Use a professional, calm visual system consistent with the supplied CareLoop reference: clear hierarchy, legible navy/blue text, restrained status colors, readable cards, and uncluttered forms.
++- Translate the reference profile content into a responsive data-driven profile; do not use the screenshot as a full-screen background with invisible clickable hotspots for the production dashboard.
++- Support desktop and tablet dashboard widths, keyboard navigation, visible focus, semantic labels, screen readers, sufficient contrast, and understandable validation.
++- Use plain-language status labels and one clear primary action per work context.
++- Keep the patient app optimized for iOS and Android with large touch targets, readable text, and clear offline/retry states.
++
++## 15. Non-functional requirements
++
++- Security: authenticated sessions, least privilege, server-side authorization, protected files, auditability, secure token lifecycle, and secret management.
++- Reliability: idempotent QR consumption and record creation where appropriate; clear failure/retry behavior; no false success state.
++- Performance: searchable/paginated lists and responsive patient-record navigation at pilot scale; establish measurable targets during implementation.
++- Accessibility: keyboard and screen-reader support in the dashboard; dynamic text and large touch targets in the patient app.
++- Localization: design dates, phone numbers, names, and messages so clinic languages and regional formats can be added without hard-coded assumptions.
++- Privacy: collect only fields needed for the care workflow; make patient sharing explicit and inspectable.
++
++## 16. End-to-end acceptance criteria
++
++A release candidate is not complete until these scenarios pass:
++
++1. A new doctor/staff member can register with required profile fields, verify contact details, set a password, request a role, and receive a unique code after valid submission.
++2. A duplicate email cannot create a second account; the interface offers login/reset. The existing account can log in with valid credentials.
++3. A pending or disabled user cannot enter protected patient pages; an administrator can approve, assign, change permissions, or deactivate the account.
++4. A user sees only permitted organizations, groups, patients, and fields; cross-organization and unassigned-patient access tests fail closed.
++5. A patient can be created, allocated, reassigned with history, searched, and opened without losing the current list filters.
++6. An authorized user can generate, expire, revoke, and inspect a QR invitation. Invalid, expired, revoked, replayed, and wrong-patient attempts do not link accounts.
++7. QR scanning shows correct doctor/clinic details, obtains patient confirmation, and creates the relationship once. The QR itself contains no patient record details.
++8. Each test can be entered/uploaded under its exact test name; required metadata and file validation work; the report appears in the correct review queue.
++9. A reviewer can review, amend, and share a report; the audit trail and patient-visible state update correctly.
++10. Medication records can be added and updated by authorized roles with author, date, status, and history; no automated dose/treatment recommendation is produced.
++11. Care plans and milestones can be created, assigned, dated, updated, completed, and linked to appointments/reports.
++12. A patient appointment can be scheduled, confirmed, rescheduled, cancelled, missed, and completed; every transition is visible in history.
++13. Follow-up queues correctly identify due/overdue/missed items from configured dates, preserve an owner or unassigned status, and record contact attempts and outcomes.
++14. A permitted dashboard update appears in the patient app after backend confirmation; a failed network request shows failure/retry rather than success.
++15. An unauthorized staff role cannot alter restricted clinical fields by calling the backend directly.
++16. Empty, loading, error, offline, and populated states are usable and contain no inert controls or unexplained blank panels.
++17. Desktop, tablet, iOS, and Android user flows are tested on representative screen sizes; forms, keyboard behavior, dates, and navigation remain usable.
++18. Audit, backup/restore, file access, notification failure, and account revocation tests are documented and pass for the pilot configuration.
++
++## 17. Recommended implementation sequence
++
++### Phase 0 — Product and data baseline
++
++- Confirm pilot clinic, role catalog, allocation rules, patient matching rules, report-sharing workflow, medication ownership, consent text, and notification channels.
++- Define data dictionary, status transitions, retention, audit events, and integration boundaries.
++- Resolve the expanded scope against the existing patient-app plan: the current plan defers clinical records, reports, and medications and treats the care-team dashboard as a separate surface. This document adds those capabilities and should be treated as a product-level expansion, not as proof they already exist.
++
++### Phase 1 — Identity, organization, and permissions
++
++- Implement organization/location setup, staff registration, unique email identity, password reset, generated staff codes, role requests/approval, team membership, and server-enforced access rules.
++- Test duplicate-email and least-privilege behavior before loading real patient data.
++
++### Phase 2 — Patient directory and allocation
++
++- Implement patient registration, search, groups, primary doctor/support-team allocation, assignment history, and patient summary.
++- Add an unassigned queue and audit trail.
++
++### Phase 3 — QR connection and patient identity
++
++- Implement short-lived, one-time QR invitations, patient verification/consent, connection status, revoke/expiry, manual-code fallback, and patient app retrieval from the backend.
++- Exercise replay, expiry, wrong-patient, and network interruption cases.
++
++### Phase 4 — Operational follow-up foundation
++
++- Implement appointment calendar, statuses, reschedule requests, follow-up tasks, ownership, contact-attempt history, due/overdue queues, and patient responses.
++- Validate the end-to-end continuity loop before expanding reporting features.
++
++### Phase 5 — Reports, tests, medications, and care plans
++
++- Add individually named test/report records, private file upload, review workflow, patient sharing, medication records, care plans, and linked milestones.
++- Add versioning and audit coverage before enabling clinician workflows.
++
++### Phase 6 — Notifications, usability, and integration
++
++- Add configured push/email/SMS notifications, delivery logs, accessibility/localization, responsive refinement, and operational monitoring.
++- Integrate external EMR/lab/scheduling sources incrementally with reconciliation and failure queues.
++
++### Phase 7 — Pilot and release readiness
++
++- Seed clearly labelled test data; run role-based, data-isolation, functional, upload, QR, sync, accessibility, and cross-device tests.
++- Train clinic users, monitor pilot measures, resolve defects, and expand only after the care team confirms the workflow.
++
++## 18. Definition of done
++
++A feature is done only when:
++
++- The relevant role can complete its real workflow through a working interface.
++- Data is validated, persisted, permission-checked on the server, and shown correctly after refresh/re-login.
++- Loading, empty, error, retry, and success states are implemented and tested.
++- Cross-role visibility and audit behavior are verified.
++- Web dashboard and patient app reflect the intended shared data and sharing rules.
++- Automated tests and representative manual device/browser checks pass.
++- Documentation describes configuration, support, and failure recovery.
++- No production screen relies on a reference screenshot as its UI implementation and no action falsely claims completion.
++
++---
++
++## Appendix A — Reference-screen content checklist
++
++The supplied doctor-profile screenshot is a visual/content reference. The production profile should render real saved values for:
++
++- Connected status.
++- Doctor name and credentials.
++- Specialty/specialization.
++- Gender and displayed age where configured and appropriate.
++- Hospital/working location and city/area.
++- Years of experience.
++- “Part of your care team” relationship.
++- “Contact care team” action and approved phone/contact route.
++
++The reference's example person, values, and hospital must not be copied into production patient records. Empty profile values should use an explicit “Not provided” state or an appropriate fallback, not blank space.
++
++## Appendix B — Domain objects for engineering estimation
++
++Initial entities should include `organizations`, `locations`, `users`, `staff_profiles`, `role_templates`, `permissions`, `care_teams`, `team_memberships`, `patients`, `patient_assignments`, `consents`, `qr_invitations`, `encounters`, `reports`, `report_files`, `medications`, `care_plans`, `care_plan_milestones`, `appointments`, `follow_up_tasks`, `contact_attempts`, `notifications`, and `audit_events`.
++
++Use stable IDs and organization scoping on every tenant-owned record. Define foreign keys, indexes, retention behavior, row-level access rules, and allowed state transitions before implementation. Store files separately from structured report metadata and serve them through authorized, expiring access.

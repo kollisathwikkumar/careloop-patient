@@ -1,0 +1,49 @@
+VERIFICATION RECORD — CareLoop code-native patient screens
+
+CHANGED_BRANCH: main
+CHANGED_FIELDS:
+- Replaced full-screen patient-tab image compositions with responsive React Native layout, text, cards, iconography, progress/timeline, filters, and tab navigation.
+- Retained only the doctor and patient portraits as image assets within these screens.
+- Made the Home appointment card fit with the journey, doctor, and reminder cards on the iPhone 17 Pro Max viewport.
+- Added timeline connector rails and corrected Alerts grouping so the rescheduled appointment appears only under Earlier.
+
+ARTIFACTS
+MODIFIED_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/artifacts/careloop-code-native/MODIFIED_FILE
+DIFF_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/artifacts/careloop-code-native/DIFF_FILE
+VERIFICATION_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/artifacts/careloop-code-native/VERIFICATION.txt
+ROLLBACK_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/artifacts/careloop-code-native/ROLLBACK.sh
+
+SOURCE FILES AND HASHES
+BASELINE_COMMIT: 74645d6a7634f6c5400c0803ba4878c42a471bd4
+- src/app/(tabs)/home.tsx — baseline blob 206c1a0c54c362bd2c0fd4e0d049e1e3c3578e29; modified SHA-256 06ce0cd76cf8b48da46f95c7eb1f4b35116a1f2688fedbdb086181f4dc693a17
+- src/app/(tabs)/alerts.tsx — baseline blob 52d38546a15d616b283ee14770cc07b525f75c88; modified SHA-256 6c7b3112286fe7dbbbae057bd0f79ae4699af80ab7801e3451a805bd4128defc
+- src/app/(tabs)/journey.tsx — baseline blob c2363bea3da1af6aafd37dded8402e5e74db7907; modified SHA-256 09bef67cbac0fa2688bc0be9d3f31ec58e466d38a6699448047fcf3b7e42e94e
+- src/components/careloop-ui.tsx — new shared code-native component; modified SHA-256 22ab8e2f8e0597061122c05c16ee58d10f140bc5002a305abf58d2b08cac1507
+- src/app/(tabs)/more.tsx — code-native More screen; modified SHA-256 7e37019254283bdb61ddb72d778f835cea6127ec550b66bb85c6ba6b1486d952
+
+BASELINE
+COMMANDS:
+- npx tsc --noEmit
+- npx expo lint
+INPUT: isolated pre-native snapshot reconstructed from the baseline commit plus the already-existing route adjustments and web-hook change; generated Expo type declarations and shared installed dependencies were included.
+LITERAL OUTPUT: TypeScript output was empty. Expo lint output was empty.
+RESULT: both commands exit 0.
+
+MODIFIED
+COMMAND: npx tsc --noEmit && npx expo lint && git diff --check && npx expo export --platform ios --output-dir /tmp/careloop-export-ios && npx expo export --platform android --output-dir /tmp/careloop-export-android
+INPUT: current CareLoop patient-app source tree.
+LITERAL OUTPUT: TypeScript and lint passed; git diff --check produced no output. `iOS Bundled 8638ms node_modules/expo-router/entry.js (1200 modules)`; `Exported: /tmp/careloop-export-ios`. `Android Bundled 10473ms node_modules/expo-router/entry.js (1332 modules)`; `Exported: /tmp/careloop-export-android` (including Material Symbols font).
+RESULT: exit 0. Both platform exports completed.
+
+SIMULATOR
+COMMAND: xcrun simctl openurl booted 'exp://127.0.0.1:8081/--/<route>' followed by xcrun simctl io booted screenshot <PNG path>; interactive checks used the Device Hub accessibility tree.
+INPUT: iPhone 17 Pro Max simulator, iOS 27.0; routes home, journey, alerts, more, and appointments.
+LITERAL OUTPUT: Home, Journey, Alerts, More, and My Appointments appeared in the accessibility tree. The reschedule form exposed date/time choices; selecting 28 September 2026 and 10:30 AM showed `28 September 2026 · 10:30 AM`. `Send request` displayed `Request sent` and `Your care team will confirm the new appointment time.` The saved Home state then showed 28 September 2026, Monday, 10:30 AM. Alerts filters separated the rescheduled item under Earlier without duplicating it under Today.
+RESULT: route and reschedule-flow smoke checks passed; four reviewed screenshots are in `previews/`.
+
+ROLLBACK
+COMMAND: /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/artifacts/careloop-code-native/ROLLBACK.sh /tmp/careloop-rollback-test.J4S9Bc
+INPUT: isolated copy of the pre-native snapshot with the three modified tracked patient screens and new shared component overlaid.
+LITERAL OUTPUT: `Restored 3 patient screens to 74645d6a7634f6c5400c0803ba4878c42a471bd4 in isolated copy; removed the added shared UI component.` All three restored Git object hashes matched baseline. TypeScript and Expo lint passed in the rollback copy.
+RESULT: exit 0.
+RESTORED_BEHAVIOR/STATUS: the rollback copy returned to baseline screen source and passed baseline checks; the active working tree was not rolled back. Its Home source remains changed at SHA-256 06ce0cd76cf8b48da46f95c7eb1f4b35116a1f2688fedbdb086181f4dc693a17.

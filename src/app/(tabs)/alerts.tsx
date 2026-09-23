@@ -1,44 +1,43 @@
-import { Image } from 'expo-image';
-import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, type JSX } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { DEFAULT_APPOINTMENT, isAppointmentChanged, loadAppointment, type AppointmentSchedule } from '@/lib/appointment';
+import { CareLoopCard, CareLoopColors as C, CareLoopIcon, PatientAppFrame, type CareLoopIconName } from '@/components/careloop-ui';
 
-type AlertKind =
-  | 'upcoming'
-  | 'confirmed'
-  | 'reminder'
-  | 'rescheduled'
-  | 'message'
-  | 'care-plan';
-
+type AlertKind = 'upcoming' | 'confirmed' | 'reminder' | 'rescheduled' | 'message' | 'care-plan';
 type AlertFilter = 'all' | 'appointments' | 'updates' | 'reminders';
+type AlertCategory = Exclude<AlertFilter, 'all'>;
 
 type NotificationRow = {
   kind: AlertKind;
   title: string;
   body: string;
   date: string;
-  category: Exclude<AlertFilter, 'all'>;
+  category: AlertCategory;
+  icon: CareLoopIconName;
   accent: string;
+  surface: string;
+  unread: boolean;
 };
 
-const ALERT_SOURCES: Record<AlertFilter, number> = {
-  all: require('@/assets/images/careloop/alerts-app.png'),
-  appointments: require('@/assets/images/careloop/alerts-appointments-app.png'),
-  updates: require('@/assets/images/careloop/alerts-updates-app.png'),
-  reminders: require('@/assets/images/careloop/alerts-reminders-app.png'),
-};
+const FILTERS: readonly { key: AlertFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'appointments', label: 'Appointments' },
+  { key: 'updates', label: 'Updates' },
+  { key: 'reminders', label: 'Reminders' },
+];
 
-const FILTERED_NOTIFICATIONS: readonly NotificationRow[] = [
+const NOTIFICATIONS: readonly NotificationRow[] = [
   {
     kind: 'upcoming',
     title: 'Upcoming appointment',
-    body: 'Your follow-up visit is tomorrow, 28 September 2026 at 10:30 AM.',
+    body: 'Your follow-up visit is scheduled for 28 September 2026 at 10:30 AM with Dr. K. Sathwik.',
     date: '10:00 AM',
     category: 'appointments',
-    accent: '#087EF5',
+    icon: 'calendar',
+    accent: C.blue,
+    surface: '#EAF4FF',
+    unread: true,
   },
   {
     kind: 'confirmed',
@@ -46,7 +45,21 @@ const FILTERED_NOTIFICATIONS: readonly NotificationRow[] = [
     body: 'Your appointment on 21 September 2026 has been marked as completed.',
     date: '9:20 AM',
     category: 'appointments',
-    accent: '#00BF8F',
+    icon: 'check',
+    accent: C.green,
+    surface: C.greenSurface,
+    unread: false,
+  },
+  {
+    kind: 'reminder',
+    title: 'Reminder',
+    body: 'Please bring any required documents to your next appointment.',
+    date: '8:00 AM',
+    category: 'reminders',
+    icon: 'reminder',
+    accent: C.red,
+    surface: C.redSurface,
+    unread: true,
   },
   {
     kind: 'rescheduled',
@@ -54,7 +67,10 @@ const FILTERED_NOTIFICATIONS: readonly NotificationRow[] = [
     body: 'Your appointment has been rescheduled to 12 October 2026 at 10:30 AM.',
     date: '25 Sep',
     category: 'appointments',
-    accent: '#7058D8',
+    icon: 'calendar',
+    accent: C.purple,
+    surface: C.purpleSurface,
+    unread: false,
   },
   {
     kind: 'message',
@@ -62,7 +78,10 @@ const FILTERED_NOTIFICATIONS: readonly NotificationRow[] = [
     body: 'Your doctor has added a new note for your next visit.',
     date: '24 Sep',
     category: 'updates',
-    accent: '#087EF5',
+    icon: 'message',
+    accent: C.blue,
+    surface: '#EAF4FF',
+    unread: true,
   },
   {
     kind: 'care-plan',
@@ -70,118 +89,59 @@ const FILTERED_NOTIFICATIONS: readonly NotificationRow[] = [
     body: 'A new follow-up has been added to your care journey.',
     date: '20 Sep',
     category: 'updates',
-    accent: '#FF9700',
-  },
-  {
-    kind: 'reminder',
-    title: 'Reminder',
-    body: 'Please bring any required documents tomorrow.',
-    date: '8:00 AM',
-    category: 'reminders',
-    accent: '#F24856',
+    icon: 'document',
+    accent: C.amber,
+    surface: C.amberSurface,
+    unread: false,
   },
 ];
 
-function AlertHotspot({
-  accessibilityLabel,
-  onPress,
-  style,
-}: {
-  accessibilityLabel: string;
-  onPress: () => void;
-  style: object;
-}) {
-  return <Pressable accessibilityLabel={accessibilityLabel} accessibilityRole="button" onPress={onPress} style={[styles.hotspot, style]} />;
-}
-
-function AlertBackground({ filter }: { filter: AlertFilter }): JSX.Element {
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={[StyleSheet.absoluteFill, styles.opaqueBackground]} />
-      <Image key={`alert-background-${filter}`} accessibilityLabel={filter === 'all' ? 'CareLoop alerts' : 'CareLoop filtered alerts'} contentFit="fill" source={ALERT_SOURCES[filter]} style={StyleSheet.absoluteFill} />
-    </View>
-  );
-}
-
-function BackToHomeButton({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable accessibilityLabel="Back to Home" accessibilityRole="button" onPress={onPress} style={styles.backButton}>
-      <Text style={styles.backChevron}>‹</Text>
-    </Pressable>
-  );
-}
-
-function AlertsHeader({ onBack }: { onBack: () => void }) {
-  return (
-    <>
-      <View pointerEvents="none" style={styles.headerMask} />
-      <View pointerEvents="box-none" style={styles.header}>
-        <BackToHomeButton onPress={onBack} />
-        <View pointerEvents="none" style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>Alerts</Text>
-          <Text style={styles.headerSubtitle}>Stay updated on your appointments{`\n`}and care journey.</Text>
-        </View>
-      </View>
-    </>
-  );
-}
-
-type FilterChipProps = {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-  style: StyleProp<ViewStyle>;
-};
-
-function FilterChip({ active, label, onPress, style }: FilterChipProps): JSX.Element {
-  return (
-    <Pressable
-      accessibilityLabel={`${label} filter`}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={[styles.filterChip, active ? styles.activeFilterChip : null, style]}
-    >
-      <Text allowFontScaling={false} style={[styles.filterChipText, active ? styles.activeFilterChipText : null]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function FilterBar({ filter, onPress }: { filter: AlertFilter; onPress: (nextFilter: AlertFilter) => void }): JSX.Element {
-  return (
-    <>
-      <View pointerEvents="none" style={styles.filterBarMask} />
-      <View style={styles.filterBar}>
-        <FilterChip active={filter === 'all'} label="All" onPress={() => onPress('all')} style={styles.allFilterChip} />
-        <FilterChip active={filter === 'appointments'} label="Appointments" onPress={() => onPress('appointments')} style={styles.appointmentsFilterChip} />
-        <FilterChip active={filter === 'updates'} label="Updates" onPress={() => onPress('updates')} style={styles.updatesFilterChip} />
-        <FilterChip active={filter === 'reminders'} label="Reminders" onPress={() => onPress('reminders')} style={styles.remindersFilterChip} />
-      </View>
-    </>
-  );
-}
-
-function UpdatedAlertAppointment({ appointment }: { appointment: AppointmentSchedule }): JSX.Element | null {
-  if (!isAppointmentChanged(appointment)) {
-    return null;
+function notificationCopy(item: NotificationRow, appointment: AppointmentSchedule): string {
+  if (item.kind === 'upcoming' && isAppointmentChanged(appointment)) {
+    const action = appointment.status === 'confirmed' ? 'Your follow-up visit is confirmed' : 'Your reschedule request is with the care team';
+    return `${action} for ${appointment.date} at ${appointment.time}.`;
   }
+  return item.body;
+}
 
+function AlertCard({
+  item,
+  appointment,
+  read,
+  onPress,
+}: {
+  item: NotificationRow;
+  appointment: AppointmentSchedule;
+  read: boolean;
+  onPress: () => void;
+}): JSX.Element {
   return (
-    <View pointerEvents="none" style={styles.updatedAlertLayer}>
-      <View style={styles.updatedAlertTimeMask}>
-        <Text style={styles.updatedAlertTime}>{appointment.time}</Text>
-      </View>
-      <View style={styles.updatedAlertBodyMask}>
-        <Text style={styles.updatedAlertBody}>{appointment.status === 'confirmed' ? `Appointment confirmed for ${appointment.date}.` : `Reschedule requested for ${appointment.date}.`}</Text>
-      </View>
-    </View>
+    <Pressable accessibilityLabel={`${item.title}. ${notificationCopy(item, appointment)}`} accessibilityRole="button" onPress={onPress}>
+      <CareLoopCard style={styles.notificationCard}>
+        <View style={[styles.alertIcon, { backgroundColor: item.surface }]}>
+          <CareLoopIcon color={item.accent} name={item.icon} size={22} />
+        </View>
+        <View style={styles.notificationCopy}>
+          <View style={styles.notificationTitleRow}>
+            <Text style={styles.notificationTitle}>{item.title}</Text>
+            {!read && item.unread ? <View style={styles.unreadDot} /> : null}
+          </View>
+          <Text style={styles.notificationBody}>{notificationCopy(item, appointment)}</Text>
+        </View>
+        <View style={styles.notificationTrailing}>
+          <Text style={styles.notificationTime}>{item.kind === 'upcoming' && isAppointmentChanged(appointment) ? appointment.time : item.date}</Text>
+          <CareLoopIcon name="chevron" size={17} color={C.secondary} />
+        </View>
+      </CareLoopCard>
+    </Pressable>
   );
 }
 
-export default function AlertsScreen() {
+export default function AlertsScreen(): JSX.Element {
   const router = useRouter();
   const [filter, setFilter] = useState<AlertFilter>('all');
   const [appointment, setAppointment] = useState<AppointmentSchedule>(DEFAULT_APPOINTMENT);
+  const [allRead, setAllRead] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -190,107 +150,114 @@ export default function AlertsScreen() {
         setAppointment(loadedAppointment);
       }
     });
-
     return () => {
       active = false;
     };
   }, []);
 
-  const openAlert = (kind: AlertKind): void => {
-    router.push({ pathname: '/alert-detail', params: { type: kind } });
-  };
+  const visibleNotifications = NOTIFICATIONS.filter((item) => filter === 'all' || item.category === filter);
+  const upcoming = visibleNotifications.filter((item) => item.kind === 'upcoming' || item.kind === 'confirmed' || item.kind === 'reminder');
+  const earlier = visibleNotifications.filter((item) => item.kind === 'rescheduled' || item.kind === 'message' || item.kind === 'care-plan');
 
-  const showFilter = (nextFilter: AlertFilter): void => {
-    setFilter(nextFilter);
-  };
-
-  const filteredNotifications = FILTERED_NOTIFICATIONS.filter((item) => item.category === filter);
-
-  if (filter !== 'all') {
-    return (
-      <View style={styles.screen}>
-        <StatusBar hidden />
-        <AlertBackground filter={filter} />
-        {filter === 'appointments' ? <UpdatedAlertAppointment appointment={appointment} /> : null}
-        <AlertsHeader onBack={() => router.replace('/home')} />
-        <AlertHotspot accessibilityLabel="Mark all read" onPress={() => Alert.alert('Alerts', 'All alerts are marked as read.')} style={styles.markReadHotspot} />
-        <FilterBar filter={filter} onPress={showFilter} />
-        {filteredNotifications.map((item, index) => (
-          <AlertHotspot
-            accessibilityLabel={item.title}
-            key={item.kind}
-            onPress={() => openAlert(item.kind)}
-            style={[styles.filteredCardHotspot, { top: `${24 + index * 11}%` }]}
-          />
-        ))}
-        <View style={styles.bottomNav}>
-          <AlertHotspot accessibilityLabel="Home" onPress={() => router.replace('/home')} style={styles.navHotspot} />
-          <AlertHotspot accessibilityLabel="Journey" onPress={() => router.replace('/journey')} style={styles.navHotspot} />
-          <AlertHotspot accessibilityLabel="Alerts" onPress={() => undefined} style={styles.navHotspot} />
-          <AlertHotspot accessibilityLabel="More" onPress={() => Alert.alert('More', 'More CareLoop options.')} style={styles.navHotspot} />
-        </View>
-      </View>
-    );
-  }
+  const renderAlert = (item: NotificationRow): JSX.Element => (
+    <AlertCard
+      appointment={appointment}
+      item={item}
+      key={item.kind}
+      onPress={() => router.push({ pathname: '/alert-detail', params: { type: item.kind } })}
+      read={allRead}
+    />
+  );
 
   return (
-    <View style={styles.screen}>
-      <StatusBar hidden />
-      <AlertBackground filter="all" />
-      <UpdatedAlertAppointment appointment={appointment} />
-      <AlertsHeader onBack={() => router.replace('/home')} />
-      <AlertHotspot accessibilityLabel="Mark all read" onPress={() => Alert.alert('Alerts', 'All alerts are marked as read.')} style={styles.markReadHotspot} />
-      <FilterBar filter={filter} onPress={showFilter} />
-      <AlertHotspot accessibilityLabel="Upcoming appointment" onPress={() => openAlert('upcoming')} style={styles.upcomingHotspot} />
-      <AlertHotspot accessibilityLabel="Appointment confirmed" onPress={() => openAlert('confirmed')} style={styles.confirmedHotspot} />
-      <AlertHotspot accessibilityLabel="Reminder" onPress={() => openAlert('reminder')} style={styles.reminderHotspot} />
-      <AlertHotspot accessibilityLabel="Appointment rescheduled" onPress={() => openAlert('rescheduled')} style={styles.rescheduledHotspot} />
-      <AlertHotspot accessibilityLabel="Message from care team" onPress={() => openAlert('message')} style={styles.messageHotspot} />
-      <AlertHotspot accessibilityLabel="Care plan updated" onPress={() => openAlert('care-plan')} style={styles.carePlanHotspot} />
-      <View style={styles.bottomNav}>
-        <AlertHotspot accessibilityLabel="Home" onPress={() => router.replace('/home')} style={styles.navHotspot} />
-        <AlertHotspot accessibilityLabel="Journey" onPress={() => router.replace('/journey')} style={styles.navHotspot} />
-        <AlertHotspot accessibilityLabel="Alerts" onPress={() => undefined} style={styles.navHotspot} />
-        <AlertHotspot accessibilityLabel="More" onPress={() => Alert.alert('More', 'More CareLoop options.')} style={styles.navHotspot} />
-      </View>
-    </View>
+    <PatientAppFrame activeTab="alerts" backgroundColor={C.surface}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Pressable accessibilityLabel="Back to Home" accessibilityRole="button" onPress={() => router.replace('/home')} style={styles.backButton}>
+            <Text style={styles.backChevron}>‹</Text>
+          </Pressable>
+          <View style={styles.headerCopy}>
+            <Text style={styles.title}>Alerts</Text>
+            <Text style={styles.subtitle}>Stay updated on your appointments and care journey.</Text>
+          </View>
+          <Pressable accessibilityRole="button" onPress={() => setAllRead(true)} style={styles.markReadButton}>
+            <Text style={styles.markReadText}>{allRead ? 'All read' : 'Mark all read'}</Text>
+          </Pressable>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.filterList} horizontal showsHorizontalScrollIndicator={false}>
+          {FILTERS.map((item) => {
+            const selected = filter === item.key;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                key={item.key}
+                onPress={() => setFilter(item.key)}
+                style={[styles.filterChip, selected && styles.filterChipSelected]}
+              >
+                <Text style={[styles.filterText, selected && styles.filterTextSelected]}>{item.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {upcoming.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Today</Text>
+            {upcoming.map(renderAlert)}
+          </View>
+        ) : null}
+
+        {earlier.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Earlier</Text>
+            {earlier.map(renderAlert)}
+          </View>
+        ) : null}
+
+        {visibleNotifications.length === 0 ? (
+          <CareLoopCard style={styles.emptyCard}>
+            <View style={styles.emptyIcon}>
+              <CareLoopIcon name="alerts" size={25} />
+            </View>
+            <Text style={styles.emptyTitle}>You’re all caught up</Text>
+            <Text style={styles.emptyBody}>New appointment updates and reminders will appear here.</Text>
+          </CareLoopCard>
+        ) : null}
+      </ScrollView>
+    </PatientAppFrame>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#FFFFFF' },
-  opaqueBackground: { backgroundColor: '#FFFFFF' },
-  hotspot: { position: 'absolute', backgroundColor: 'transparent' },
-  headerMask: { backgroundColor: '#FFFFFF', height: '11.8%', left: 0, position: 'absolute', top: '4.2%', width: '72%', zIndex: 2 },
-  header: { height: '11.8%', left: 0, position: 'absolute', right: 0, top: '4.2%', zIndex: 3 },
-  backButton: { alignItems: 'center', height: 38, justifyContent: 'center', left: '3%', position: 'absolute', top: 0, width: '8%' },
-  backChevron: { color: '#0A376E', fontSize: 38, fontWeight: '300', lineHeight: 38 },
-  headerCopy: { left: '13%', position: 'absolute', right: '28%', top: 0 },
-  headerTitle: { color: '#0A376E', fontSize: 22, fontWeight: '800', lineHeight: 28 },
-  headerSubtitle: { color: '#6580A3', fontSize: 15, lineHeight: 22, marginTop: 1 },
-  markReadHotspot: { right: '3%', top: '5%', width: '27%', height: '7%' },
-  filterBarMask: { backgroundColor: '#FFFFFF', height: '7%', left: 0, position: 'absolute', right: 0, top: '15.1%', zIndex: 4 },
-  filterBar: { alignItems: 'center', flexDirection: 'row', height: '6%', justifyContent: 'space-between', left: '4%', position: 'absolute', right: '3%', top: '16%', zIndex: 5 },
-  filterChip: { alignItems: 'center', backgroundColor: '#F5F7FA', borderRadius: 24, height: '100%', justifyContent: 'center' },
-  activeFilterChip: { backgroundColor: '#DDEEFF' },
-  filterChipText: { color: '#173A68', fontSize: 13, fontWeight: '600', lineHeight: 17, textAlign: 'center' },
-  activeFilterChipText: { color: '#087EF5' },
-  allFilterChip: { width: '17%' },
-  appointmentsFilterChip: { width: '29%' },
-  updatesFilterChip: { width: '23%' },
-  remindersFilterChip: { width: '21%' },
-  upcomingHotspot: { left: '4%', right: '3%', top: '24%', height: '11%' },
-  confirmedHotspot: { left: '4%', right: '3%', top: '36%', height: '11%' },
-  reminderHotspot: { left: '4%', right: '3%', top: '48%', height: '11%' },
-  rescheduledHotspot: { left: '4%', right: '3%', top: '61%', height: '11%' },
-  messageHotspot: { left: '4%', right: '3%', top: '73%', height: '11%' },
-  carePlanHotspot: { left: '4%', right: '3%', top: '85%', height: '11%' },
-  bottomNav: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '10%', flexDirection: 'row' },
-  navHotspot: { position: 'relative', flex: 1, height: '100%' },
-  filteredCardHotspot: { left: '4%', right: '3%', height: '11%' },
-  updatedAlertLayer: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 1 },
-  updatedAlertTimeMask: { alignItems: 'flex-end', backgroundColor: '#FFFFFF', borderRadius: 8, height: '4.8%', justifyContent: 'center', paddingHorizontal: 4, position: 'absolute', right: '8%', top: '25.2%', width: '30%' },
-  updatedAlertTime: { color: '#6580A3', fontSize: 13, fontWeight: '700', textAlign: 'right' },
-  updatedAlertBodyMask: { backgroundColor: '#FFFFFF', borderRadius: 8, left: '20%', minHeight: '9.2%', justifyContent: 'center', paddingHorizontal: 4, position: 'absolute', top: '27.8%', width: '62%' },
-  updatedAlertBody: { color: '#6580A3', fontSize: 13, lineHeight: 20 },
+  content: { alignSelf: 'center', maxWidth: 560, paddingBottom: 20, paddingHorizontal: 18, paddingTop: 17, width: '100%' },
+  header: { alignItems: 'flex-start', flexDirection: 'row', marginBottom: 18, minHeight: 66 },
+  backButton: { alignItems: 'center', height: 42, justifyContent: 'center', marginRight: 8, width: 27 },
+  backChevron: { color: C.navy, fontSize: 38, fontWeight: '300', lineHeight: 40, marginTop: -4 },
+  headerCopy: { flex: 1, paddingRight: 5 },
+  title: { color: C.navyDeep, fontSize: 25, fontWeight: '800', lineHeight: 31 },
+  subtitle: { color: C.secondary, fontSize: 13, lineHeight: 19, marginTop: 2 },
+  markReadButton: { alignItems: 'flex-end', justifyContent: 'center', minHeight: 40, minWidth: 67 },
+  markReadText: { color: C.blue, fontSize: 12, fontWeight: '700' },
+  filterList: { alignItems: 'center', gap: 8, paddingBottom: 5, paddingRight: 8 },
+  filterChip: { alignItems: 'center', backgroundColor: '#F2F6FA', borderRadius: 22, justifyContent: 'center', minHeight: 38, paddingHorizontal: 15 },
+  filterChipSelected: { backgroundColor: C.surfaceBlueStrong },
+  filterText: { color: C.navy, fontSize: 12, fontWeight: '600' },
+  filterTextSelected: { color: C.blue, fontWeight: '800' },
+  section: { gap: 10, marginTop: 18 },
+  sectionTitle: { color: C.secondary, fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  notificationCard: { alignItems: 'center', flexDirection: 'row', gap: 11, minHeight: 90, paddingHorizontal: 12, paddingVertical: 12 },
+  alertIcon: { alignItems: 'center', borderRadius: 25, height: 50, justifyContent: 'center', width: 50 },
+  notificationCopy: { flex: 1, minWidth: 0 },
+  notificationTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  notificationTitle: { color: C.navyDeep, flexShrink: 1, fontSize: 14, fontWeight: '800', lineHeight: 19 },
+  unreadDot: { backgroundColor: C.blue, borderRadius: 4, height: 8, width: 8 },
+  notificationBody: { color: C.secondary, fontSize: 12, lineHeight: 18, marginTop: 3 },
+  notificationTrailing: { alignItems: 'flex-end', alignSelf: 'stretch', justifyContent: 'space-between', paddingVertical: 2 },
+  notificationTime: { color: C.secondary, fontSize: 11, fontWeight: '600', lineHeight: 15 },
+  emptyCard: { alignItems: 'center', marginTop: 22, paddingHorizontal: 24, paddingVertical: 28 },
+  emptyIcon: { alignItems: 'center', backgroundColor: C.surfaceBlue, borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
+  emptyTitle: { color: C.navy, fontSize: 17, fontWeight: '800', marginTop: 12 },
+  emptyBody: { color: C.secondary, fontSize: 13, lineHeight: 19, marginTop: 5, textAlign: 'center' },
 });

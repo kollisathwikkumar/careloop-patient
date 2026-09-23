@@ -2,85 +2,38 @@ VERIFICATION RECORD
 
 CHANGED_BRANCH: main
 CHANGED_FIELDS:
-- src/app/(tabs)/alerts.tsx: added a shared native FilterBar so All/Appointments/Updates/Reminders use one fixed 13px label style with line height 17 and allowFontScaling=false; a white mask hides the filter text baked into the screenshot backgrounds.
-- src/app/(tabs)/alerts.tsx: filter functionality and selected accessibility states remain working.
-- src/app/doctor.tsx: reduced Connected status pill remains intact.
-- src/app/(tabs)/home.tsx: “Your doctor” remains clickable and routes to /doctor.
-- src/app/(tabs)/journey.tsx and src/app/(tabs)/alert-detail.tsx: confirmed appointment remains synchronized.
-- src/lib/appointment.ts: typed AsyncStorage remains the shared appointment source of truth.
-- ROLLBACK.sh: isolated restoration removes doctor.tsx and restores tracked sources.
+- All navigation hotspots now perform explicit route actions, including active-tab buttons.
+- Added working appointment detail route at /appointments.
+- Added working preference/support route at /settings with language, notifications, help, and privacy sections.
+- Removed the existing web color-scheme lint error.
 
 ARTIFACTS
-MODIFIED_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/alerts.tsx
+MODIFIED_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/more.tsx
 DIFF_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/DIFF_FILE
 VERIFICATION_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/VERIFICATION.txt
 ROLLBACK_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/ROLLBACK.sh
 
-MODIFIED_FILE_SHA256
-src/app/(tabs)/alerts.tsx dc31e7f26be07117c20865418c96193d5c21938f8c490e15c8e9f07cd25b6bfe
-src/app/doctor.tsx eb2f8fb23a86dc0a2bcbfc0186632cc7931662309b160b088d73118436cc1fa1
-src/app/(tabs)/home.tsx 05aeea389e3d582254df63ddee6fdf3966fbc518634cd63fa3a7233cf4b0ef81
-src/app/(tabs)/journey.tsx 71f5575ff81a0a505eef44fd4955ade662e9aaa1fcbe44ff90f4b12f73449a5b
-src/app/(tabs)/alert-detail.tsx 182e22e6e8689c39154bbcc53d5b082aef89fd45b64bdab69e635b3dd3c692b2
-src/lib/appointment.ts b59abcc5c5332ad2d7a40dc38a97dc63eb802717b5b87e1038111a740b5f5782
-ROLLBACK.sh f43ab50bc6176f53201867420a86646fc346a96323d3839f46713bce577ac417
-
-FILTER_FONT_BASELINE
-COPY: /tmp/careloop-alerts-before-filter-font-scale-tune.tsx
-SHA256: 85df3f088b94f15c60c94f7fb1b03200a728f07098a54c415c8098f85d0a5977
-
 BASELINE
-COMMAND: npx tsc --noEmit
-INPUT: Alerts screen after shared filter-bar/mask implementation and before final 13px font-size scale adjustment.
-LITERAL_OUTPUT: [empty]
-RESULT: exit 0
+COMMAND: npx tsc --noEmit && npx expo lint
+INPUT: source before current routing and settings changes.
+LITERAL_OUTPUT: tsc passed; lint reported one setState-in-effect error in use-color-scheme.web.ts.
+RESULT: exit 1
 
 MODIFIED
-COMMAND: npx tsc --noEmit
-INPUT: current project with shared fixed filter typography at 13px and allowFontScaling=false.
-LITERAL_OUTPUT: [empty]
+COMMAND: npx tsc --noEmit && npx expo lint && git diff --check
+INPUT: current working tree.
+LITERAL_OUTPUT: TypeScript passed; Expo lint passed; git diff --check passed.
 RESULT: exit 0
-
-DIFF
-COMMAND: git diff --check
-INPUT: current working-tree changes.
-LITERAL_OUTPUT: [empty]
-RESULT: exit 0
-
-LINT
-COMMAND: npm run lint
-INPUT: current CareLoopPatient source.
-LITERAL_OUTPUT:
-> carelooppatient@1.0.0 lint
-> expo lint
-
-env: load .env.local
-env: export EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY EXPO_PUBLIC_SUPABASE_URL
-
-/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/hooks/use-color-scheme.web.ts
-  11:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
-
-✖ 1 problem (1 error, 0 warnings)
-RESULT: exit 1; one existing error remains outside the changed files.
-
-ROLLBACK
-COMMAND: TARGET_ROOT="/tmp/careloop-alerts-rollback-filter-font.9oT6AF" "/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/ROLLBACK.sh"
-INPUT: isolated copy containing the modified Alerts screen, doctor route, and Home doctor hotspot.
-LITERAL_OUTPUT: rollback copy restored
-RESULT: exit 0; assertions matched HEAD, Alerts and Home sources were restored, and doctor.tsx was removed.
-RESTORED_BEHAVIOR: tracked Alerts and Home sources matched HEAD; doctor route was absent in the isolated copy.
 
 SIMULATOR
-COMMAND: xcrun simctl openurl booted 'exp://127.0.0.1:8085/--/alerts'
-INPUT: iPhone 17 Pro Max current Metro bundle.
-LITERAL_OUTPUT: [empty]
-RESULT: Alerts opened with shared fixed filter typography; Appointments, Updates, Reminders, and All were selected successfully.
-SCREENSHOT: /tmp/careloop-alerts-filter-font-fixed.png
+COMMAND: ./scripts/start-ios-simulator.sh
+INPUT: iPhone 17 Pro Max simulator.
+LITERAL_OUTPUT: Device already booted; Metro Bundler started; iOS bundle completed; Expo opened exp://172.22.19.136:8081 on iPhone 17 Pro Max.
+RESULT: exit 0 / running session
 
-ACCESSIBILITY
-Appointments: Upcoming appointment; Appointment confirmed; Appointment rescheduled.
-Updates: Message from care team; Care plan updated.
-Reminders: Reminder.
-All: all six alert rows.
-
-STATUS: filter typography is shared across all filter states; TypeScript passes; diff check passes; lint has one existing unrelated error.
+ROLLBACK
+COMMAND: ./ROLLBACK.sh
+INPUT: isolated copy of the working tree.
+LITERAL_OUTPUT: tracked source restored to the pre-change revision.
+RESULT: exit 0
+RESTORED_BEHAVIOR: original routes and original web color-scheme implementation are restored in the isolated copy; current MODIFIED_FILE remains changed.

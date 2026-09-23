@@ -1,0 +1,54 @@
+CARELOOP PATIENT — REVIEW ARTIFACT VERIFICATION
+Review date: 2026-09-23
+
+CHANGE / BRANCH / FIELD
+Branch: documentation-only code-review artifact creation.
+Changed field: added specs/careloop-code-review/CARELOOP_CODE_REVIEW.md and its three supporting evidence/rollback files. No application source, user changes, backend files, or package files were edited by this review.
+Review subject: current CareLoop Patient working tree, including pre-existing uncommitted user changes.
+
+FOUR ARTIFACT PATHS
+MODIFIED_FILE: /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/specs/careloop-code-review/CARELOOP_CODE_REVIEW.md
+DIFF_FILE: /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/specs/careloop-code-review/DIFF_FILE
+VERIFICATION.txt: /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/specs/careloop-code-review/VERIFICATION.txt
+ROLLBACK.sh: /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/specs/careloop-code-review/ROLLBACK.sh (executable)
+
+BASELINE — BEFORE REVIEW ARTIFACT CREATION
+Command: target='specs/careloop-code-review/CARELOOP_CODE_REVIEW.md'; if [[ -e "$target" ]]; then printf 'BASELINE_REVIEW_TARGET_PRESENT\n'; else printf 'BASELINE_REVIEW_TARGET_ABSENT\n'; fi
+Input: repository working tree before this review report was created.
+Literal output: BASELINE_REVIEW_TARGET_ABSENT
+Exit status: 0
+Baseline source inventory: 26 TypeScript/TSX files; 2,757 lines.
+Baseline code checks (application source was left unchanged):
+- `npx tsc --noEmit` — stdout empty; exit 0.
+- `npx expo-doctor` — 21/21 checks passed; exit 0.
+- `npx expo export --platform ios` — JavaScript bundle export passed (~3.2 MB); exit 0.
+- `npx expo export --platform android` — JavaScript bundle export passed (~3.5 MB); exit 0.
+- `npx expo export --platform web` — `ReferenceError: window is not defined` during static rendering; exit 7.
+- `npm run lint` — one `react-hooks/set-state-in-effect` error at `src/hooks/use-color-scheme.web.ts:11`; exit 1.
+- `npm audit --omit=dev` — 14 moderate, 0 high, 0 critical; exit 1.
+- `git diff --check` — no output; exit 0.
+- iOS simulator route smoke — home, more, alerts, journey, doctor opened; malformed alert `type=toString` reproduced a render crash; exit status not applicable (interactive simulator check).
+- Android runtime smoke — not run; no adb/emulator was available. Android JS bundle export passed.
+
+MODIFIED — REVIEW DOCUMENT AND SUPPORTING FILES
+Command/input: Python validation of `specs/careloop-code-review/CARELOOP_CODE_REVIEW.md`; checked required sections, severity labels, key reproduced findings, platform/test evidence, and a minimum 1,500 words.
+Literal output:
+PASS required sections
+PASS severity labels
+PASS route findings
+PASS test evidence
+PASS substantial review
+REPORT_BYTES=14028
+Exit status: 0
+Additional result: DIFF_FILE is a 14,265-byte unified new-file diff. All four paths were reopened after creation; the report and diff exist, VERIFICATION.txt exists, and ROLLBACK.sh is executable.
+
+ROLLBACK — TESTED ON A SEPARATE COPY
+Command: `TARGET_ROOT=/var/folders/fl/lnjp_zdn4gx91kqh0p5vpvh40000gn/T/careloop-review-rollback-cuma3ojv /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/specs/careloop-code-review/ROLLBACK.sh`
+Input: disposable copied report at `/var/folders/fl/lnjp_zdn4gx91kqh0p5vpvh40000gn/T/careloop-review-rollback-cuma3ojv/CARELOOP_CODE_REVIEW.md`; the script verifies the expected SHA-256 before deleting that test copy.
+Literal output:
+rollback copy restored baseline (new review removed): /var/folders/fl/lnjp_zdn4gx91kqh0p5vpvh40000gn/T/careloop-review-rollback-cuma3ojv/CARELOOP_CODE_REVIEW.md
+Exit status: 0
+Restored behavior/status: test copy absent (`TEST_COPY_RESTORED=true`); actual review report preserved (`REAL_REPORT_PRESERVED=true`). The real review artifact remains available; rollback was not run against it.
+
+REPORT SHA-256
+c4348a3fe2bb2d5e171817d670e74496888afd3516517025e3c6fbfb4676f71a  CARELOOP_CODE_REVIEW.md

@@ -1,0 +1,13 @@
+CareLoop code-native patient UI modification record
+
+CHANGED_BRANCH: main
+PRIMARY_MODIFIED_FILE: /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/home.tsx
+ADDITIONAL_FILES:
+- /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/alerts.tsx
+- /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/journey.tsx
+- /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/more.tsx
+- /Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/components/careloop-ui.tsx
+CHANGED_FIELD: full-screen UI composition is code-rendered with React Native components and styles; portraits remain image assets.
+BASELINE_COMMIT: 74645d6a7634f6c5400c0803ba4878c42a471bd4
+PRIMARY_FILE_SHA256: 06ce0cd76cf8b48da46f95c7eb1f4b35116a1f2688fedbdb086181f4dc693a17
+STATE: modified source remains active.
