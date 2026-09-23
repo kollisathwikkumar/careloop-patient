@@ -282,11 +282,10 @@ export default function HomeScreen(): JSX.Element {
               </View>
               <CareLoopIcon name="chevron" size={19} color={C.secondary} />
             </View>
-            <View style={styles.progressTrack}>
-              <View style={styles.progressTrackComplete} />
-              <View style={styles.progressTrackActive} />
-            </View>
             <View style={styles.progressNodes}>
+              <View pointerEvents="none" style={styles.progressTrack}>
+                <View style={styles.progressTrackComplete} />
+              </View>
               <ProgressNode label="Previous" date="Consultation · 21 Sep" state="complete" />
               <ProgressNode label="Next" date={shortDate(appointment.date)} state="current" />
               <ProgressNode label="Later" date="Review · 12 Oct" state="future" />
@@ -377,10 +376,9 @@ const styles = StyleSheet.create({
   sectionHeadingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   cardTitle: { color: C.navy, fontSize: 14, fontWeight: '800', lineHeight: 19 },
   cardSubtitle: { color: C.secondary, fontSize: 11, lineHeight: 15, marginTop: 1 },
-  progressTrack: { backgroundColor: '#DCEAF5', borderRadius: 3, height: 3, left: '16%', position: 'absolute', right: '16%', top: 60 },
-  progressTrackComplete: { backgroundColor: C.green, borderRadius: 3, height: '100%', width: '49%' },
-  progressTrackActive: { backgroundColor: C.blue, borderRadius: 3, height: '100%', left: '49%', position: 'absolute', width: '18%' },
-  progressNodes: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 11 },
+  progressTrack: { backgroundColor: '#DCEAF5', borderRadius: 3, height: 3, left: '16.6667%', position: 'absolute', right: '16.6667%', top: 11.5 },
+  progressTrackComplete: { backgroundColor: C.green, borderRadius: 3, height: '100%', width: '50%' },
+  progressNodes: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 11, position: 'relative' },
   progressNode: { alignItems: 'center', flex: 1, paddingHorizontal: 2 },
   progressDot: { alignItems: 'center', backgroundColor: '#F1F5F8', borderColor: '#D3E1EC', borderRadius: 13, borderWidth: 1.5, height: 26, justifyContent: 'center', marginBottom: 4, width: 26 },
   progressDotComplete: { backgroundColor: C.green, borderColor: C.green },

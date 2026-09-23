@@ -12,11 +12,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CareLoopIcon, CareLoopLogo as NativeCareLoopLogo } from '@/components/careloop-ui';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
@@ -58,12 +60,10 @@ function PrimaryButton({ label, onPress, disabled = false, variant = 'filled', i
 
 function CareLoopLogo({ compact = false }: { compact?: boolean }) {
   return (
-    <Image
-      accessibilityLabel="CareLoop — One connection. Every follow-up."
-      contentFit="contain"
-      source={require('@/assets/images/careloop/logo-lockup-transparent.png')}
-      style={compact ? styles.compactLogoImage : styles.logoImage}
-    />
+    <View style={[styles.brandLockup, compact && styles.brandLockupCompact]}>
+      <NativeCareLoopLogo compact={compact} />
+      {!compact ? <ThemedText style={styles.brandTagline}>One connection. Every follow-up.</ThemedText> : null}
+    </View>
   );
 }
 
@@ -86,12 +86,9 @@ function SplashScreenView() {
     <WaveBackdrop>
       <SafeAreaView style={styles.splashSafeArea}>
         <View style={styles.splashContent}>
-          <Image
-            accessibilityLabel="CareLoop — One connection. Every follow-up."
-            contentFit="contain"
-            source={require('@/assets/images/careloop/splash-lockup-transparent.png')}
-            style={styles.splashLockupImage}
-          />
+          <View style={styles.splashBrandScale}>
+            <CareLoopLogo />
+          </View>
         </View>
         <ThemedText style={styles.splashFooter}>A healthier tomorrow,{`\n`}together.</ThemedText>
       </SafeAreaView>
@@ -113,13 +110,7 @@ function WelcomeScreen({ onGetStarted, onSignIn }: { onGetStarted: () => void; o
             Your appointments, follow-ups{`\n`}and reminders — all in one place.
           </ThemedText>
 
-          <View style={styles.doctorImageCrop}>
-            <Image
-              contentFit="cover"
-              source={require('@/assets/images/careloop/doctor-patient.png')}
-              style={styles.doctorImage}
-            />
-          </View>
+          <CareConnectionIllustration />
 
           <View style={styles.welcomeActions}>
             <PrimaryButton label="Get Started" icon="→" onPress={onGetStarted} />
@@ -128,6 +119,46 @@ function WelcomeScreen({ onGetStarted, onSignIn }: { onGetStarted: () => void; o
         </ScrollView>
       </SafeAreaView>
     </WaveBackdrop>
+  );
+}
+
+function CareConnectionIllustration(): ReactNode {
+  return (
+    <View
+      accessible
+      accessibilityLabel="A patient and clinician connected by a heart, representing ongoing care."
+      style={styles.careIllustration}
+    >
+      <View style={styles.illustrationHalo} />
+      <View style={styles.illustrationHaloRing} />
+      <View style={styles.connectionLine} />
+
+      <View style={[styles.connectionPerson, styles.patientConnectionPerson]}>
+        <View style={[styles.connectionAvatar, styles.patientConnectionAvatar]}>
+          <CareLoopIcon color="#FFFFFF" name="person" size={47} />
+        </View>
+        <Text style={styles.connectionRole}>PATIENT</Text>
+        <Text style={styles.connectionCaption}>Your care journey</Text>
+      </View>
+
+      <View style={[styles.connectionPerson, styles.doctorConnectionPerson]}>
+        <View style={[styles.connectionAvatar, styles.doctorConnectionAvatar]}>
+          <CareLoopIcon color="#FFFFFF" name="doctor" size={45} />
+        </View>
+        <Text style={styles.connectionRole}>CARE TEAM</Text>
+        <Text style={styles.connectionCaption}>Here for every step</Text>
+      </View>
+
+      <View style={styles.connectionHeart}>
+        <CareLoopIcon color="#FFFFFF" name="heart" size={19} />
+      </View>
+      <Text style={[styles.illustrationPlus, styles.illustrationPlusLeft]}>+</Text>
+      <Text style={[styles.illustrationPlus, styles.illustrationPlusRight]}>+</Text>
+      <View style={styles.togetherPill}>
+        <View style={styles.togetherDot} />
+        <Text style={styles.togetherText}>Better care, together</Text>
+      </View>
+    </View>
   );
 }
 
@@ -456,18 +487,36 @@ const styles = StyleSheet.create({
   waveThree: { position: 'absolute', width: 520, height: 150, borderRadius: 240, borderTopWidth: 2, borderColor: '#FFFFFF', left: 50, bottom: 80, transform: [{ rotate: '12deg' }], opacity: 0.9 },
   splashSafeArea: { flex: 1 },
   splashContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 110 },
-  splashLockupImage: { width: 330, height: 350 },
+  splashBrandScale: { transform: [{ scale: 1.45 }] },
   splashFooter: { color: '#315F99', fontSize: 19, lineHeight: 28, textAlign: 'center', marginBottom: 32 },
   screenSafeArea: { flex: 1 },
   welcomeScroll: { paddingHorizontal: 25, paddingTop: 18, paddingBottom: 28, alignItems: 'center' },
-  logoImage: { width: 210, height: 180, marginBottom: 20 },
-  compactLogoImage: { width: 120, height: 82, alignSelf: 'flex-start', marginBottom: 24 },
+  brandLockup: { alignItems: 'center', marginBottom: 20 },
+  brandLockupCompact: { alignSelf: 'flex-start', marginBottom: 24 },
+  brandTagline: { color: '#456F9F', fontSize: 11, letterSpacing: 0.1, lineHeight: 15, marginTop: 4 },
   welcomeHeading: { textAlign: 'center', fontSize: 42, lineHeight: 45, fontWeight: '800', letterSpacing: -1.4 },
   headingNavy: { color: '#123B80' },
   headingBlue: { color: '#1187EA' },
   welcomeDescription: { textAlign: 'center', color: '#4F709C', fontSize: 19, lineHeight: 25, marginTop: 13 },
-  doctorImageCrop: { width: '100%', height: 290, overflow: 'hidden', marginTop: 8, borderRadius: 32 },
-  doctorImage: { width: '100%', height: '100%' },
+  careIllustration: { width: '100%', height: 290, overflow: 'hidden', marginTop: 8, borderRadius: 32, backgroundColor: 'rgba(232,247,255,0.8)', borderColor: '#D9EFFC', borderWidth: 1, position: 'relative' },
+  illustrationHalo: { alignSelf: 'center', backgroundColor: '#DDF3FF', borderRadius: 125, height: 250, position: 'absolute', top: 5, width: 250 },
+  illustrationHaloRing: { alignSelf: 'center', borderColor: 'rgba(255,255,255,0.88)', borderRadius: 138, borderWidth: 1.5, height: 276, position: 'absolute', top: -8, width: 276 },
+  connectionLine: { backgroundColor: '#76C7F3', borderRadius: 2, height: 3, left: '19%', position: 'absolute', right: '19%', top: 98 },
+  connectionPerson: { alignItems: 'center', position: 'absolute', top: 45, width: '42%' },
+  patientConnectionPerson: { left: '4%' },
+  doctorConnectionPerson: { right: '4%' },
+  connectionAvatar: { alignItems: 'center', borderColor: '#FFFFFF', borderRadius: 54, borderWidth: 5, elevation: 5, height: 108, justifyContent: 'center', shadowColor: '#0A376E', shadowOffset: { height: 5, width: 0 }, shadowOpacity: 0.12, shadowRadius: 10, width: 108 },
+  patientConnectionAvatar: { backgroundColor: '#1388E9' },
+  doctorConnectionAvatar: { backgroundColor: '#0A4A91' },
+  connectionRole: { color: '#123B80', fontSize: 10, fontWeight: '800', letterSpacing: 1, lineHeight: 14, marginTop: 8 },
+  connectionCaption: { color: '#6685AA', fontSize: 9, lineHeight: 12, marginTop: 1, textAlign: 'center' },
+  connectionHeart: { alignItems: 'center', backgroundColor: '#55BDF3', borderColor: '#FFFFFF', borderRadius: 23, borderWidth: 3, height: 46, justifyContent: 'center', left: '50%', marginLeft: -23, position: 'absolute', top: 77, width: 46 },
+  illustrationPlus: { color: '#76C7F3', fontSize: 30, fontWeight: '400', lineHeight: 34, position: 'absolute' },
+  illustrationPlusLeft: { left: '8%', top: 31 },
+  illustrationPlusRight: { right: '8%', top: 54 },
+  togetherPill: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.94)', borderColor: '#D5EBF8', borderRadius: 18, borderWidth: 1, bottom: 13, flexDirection: 'row', gap: 7, paddingHorizontal: 13, paddingVertical: 7, position: 'absolute' },
+  togetherDot: { backgroundColor: '#00A978', borderRadius: 4, height: 8, width: 8 },
+  togetherText: { color: '#315F99', fontSize: 11, fontWeight: '700', lineHeight: 15 },
   welcomeActions: { width: '100%', gap: 14, marginTop: -3 },
   actionButton: { width: '100%', minHeight: 60, borderRadius: 32, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 20, paddingHorizontal: 25 },
   filledButton: { backgroundColor: '#1185E8', experimental_backgroundImage: 'linear-gradient(90deg, #14B8EF, #0872DE)' },

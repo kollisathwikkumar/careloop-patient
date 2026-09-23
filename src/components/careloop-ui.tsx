@@ -31,6 +31,8 @@ export type CareLoopIconName =
   | 'home'
   | 'journey'
   | 'alerts'
+  | 'reports'
+  | 'medications'
   | 'more'
   | 'calendar'
   | 'clock'
@@ -54,6 +56,8 @@ const ICONS = {
   home: { ios: 'house.fill', android: 'home', web: 'home' },
   journey: { ios: 'point.topleft.down.curvedto.point.bottomright.up', android: 'route', web: 'route' },
   alerts: { ios: 'bell.fill', android: 'notifications', web: 'notifications' },
+  reports: { ios: 'doc.text.fill', android: 'description', web: 'description' },
+  medications: { ios: 'pills.fill', android: 'medication', web: 'medication' },
   more: { ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' },
   calendar: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' },
   clock: { ios: 'clock', android: 'schedule', web: 'schedule' },
@@ -101,12 +105,14 @@ export function CareLoopLogo({ compact = false }: { compact?: boolean }): ReactN
   );
 }
 
-type PatientTab = 'home' | 'journey' | 'alerts' | 'more';
+type PatientTab = 'home' | 'journey' | 'alerts' | 'reports' | 'medications' | 'more';
 
-const TABS: readonly { key: PatientTab; label: string; href: '/home' | '/journey' | '/alerts' | '/more' }[] = [
+const TABS: readonly { key: PatientTab; label: string; href: '/home' | '/journey' | '/alerts' | '/reports' | '/medications' | '/more' }[] = [
   { key: 'home', label: 'Home', href: '/home' },
   { key: 'journey', label: 'Journey', href: '/journey' },
   { key: 'alerts', label: 'Alerts', href: '/alerts' },
+  { key: 'reports', label: 'Reports', href: '/reports' },
+  { key: 'medications', label: 'Meds', href: '/medications' },
   { key: 'more', label: 'More', href: '/more' },
 ];
 
@@ -175,8 +181,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingTop: 7,
   },
-  tab: { alignItems: 'center', flex: 1, gap: 3, justifyContent: 'center', minHeight: 49, paddingHorizontal: 4 },
-  tabLabel: { color: CareLoopColors.secondary, fontSize: 11, fontWeight: '500', lineHeight: 15 },
+  tab: { alignItems: 'center', flex: 1, gap: 3, justifyContent: 'center', minHeight: 49, minWidth: 0, paddingHorizontal: 1 },
+  tabLabel: { color: CareLoopColors.secondary, fontSize: 10, fontWeight: '500', lineHeight: 14 },
   tabLabelSelected: { color: CareLoopColors.blue, fontWeight: '700' },
   card: {
     backgroundColor: CareLoopColors.surface,
