@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, type JSX } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { DEFAULT_APPOINTMENT, isAppointmentChanged, loadAppointment, type AppointmentSchedule } from '@/lib/appointment';
 
 type AlertKind =
@@ -126,6 +126,41 @@ function AlertsHeader({ onBack }: { onBack: () => void }) {
   );
 }
 
+type FilterChipProps = {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+  style: StyleProp<ViewStyle>;
+};
+
+function FilterChip({ active, label, onPress, style }: FilterChipProps): JSX.Element {
+  return (
+    <Pressable
+      accessibilityLabel={`${label} filter`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={[styles.filterChip, active ? styles.activeFilterChip : null, style]}
+    >
+      <Text allowFontScaling={false} style={[styles.filterChipText, active ? styles.activeFilterChipText : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function FilterBar({ filter, onPress }: { filter: AlertFilter; onPress: (nextFilter: AlertFilter) => void }): JSX.Element {
+  return (
+    <>
+      <View pointerEvents="none" style={styles.filterBarMask} />
+      <View style={styles.filterBar}>
+        <FilterChip active={filter === 'all'} label="All" onPress={() => onPress('all')} style={styles.allFilterChip} />
+        <FilterChip active={filter === 'appointments'} label="Appointments" onPress={() => onPress('appointments')} style={styles.appointmentsFilterChip} />
+        <FilterChip active={filter === 'updates'} label="Updates" onPress={() => onPress('updates')} style={styles.updatesFilterChip} />
+        <FilterChip active={filter === 'reminders'} label="Reminders" onPress={() => onPress('reminders')} style={styles.remindersFilterChip} />
+      </View>
+    </>
+  );
+}
+
 function UpdatedAlertAppointment({ appointment }: { appointment: AppointmentSchedule }): JSX.Element | null {
   if (!isAppointmentChanged(appointment)) {
     return null;
@@ -179,10 +214,7 @@ export default function AlertsScreen() {
         {filter === 'appointments' ? <UpdatedAlertAppointment appointment={appointment} /> : null}
         <AlertsHeader onBack={() => router.replace('/home')} />
         <AlertHotspot accessibilityLabel="Mark all read" onPress={() => Alert.alert('Alerts', 'All alerts are marked as read.')} style={styles.markReadHotspot} />
-        <AlertHotspot accessibilityLabel="All alerts filter" onPress={() => showFilter('all')} style={styles.allFilterHotspot} />
-        <AlertHotspot accessibilityLabel="Appointments filter" onPress={() => showFilter('appointments')} style={styles.appointmentsFilterHotspot} />
-        <AlertHotspot accessibilityLabel="Updates filter" onPress={() => showFilter('updates')} style={styles.updatesFilterHotspot} />
-        <AlertHotspot accessibilityLabel="Reminders filter" onPress={() => showFilter('reminders')} style={styles.remindersFilterHotspot} />
+        <FilterBar filter={filter} onPress={showFilter} />
         {filteredNotifications.map((item, index) => (
           <AlertHotspot
             accessibilityLabel={item.title}
@@ -208,10 +240,7 @@ export default function AlertsScreen() {
       <UpdatedAlertAppointment appointment={appointment} />
       <AlertsHeader onBack={() => router.replace('/home')} />
       <AlertHotspot accessibilityLabel="Mark all read" onPress={() => Alert.alert('Alerts', 'All alerts are marked as read.')} style={styles.markReadHotspot} />
-      <AlertHotspot accessibilityLabel="All alerts filter" onPress={() => showFilter('all')} style={styles.allFilterHotspot} />
-      <AlertHotspot accessibilityLabel="Appointments filter" onPress={() => showFilter('appointments')} style={styles.appointmentsFilterHotspot} />
-      <AlertHotspot accessibilityLabel="Updates filter" onPress={() => showFilter('updates')} style={styles.updatesFilterHotspot} />
-      <AlertHotspot accessibilityLabel="Reminders filter" onPress={() => showFilter('reminders')} style={styles.remindersFilterHotspot} />
+      <FilterBar filter={filter} onPress={showFilter} />
       <AlertHotspot accessibilityLabel="Upcoming appointment" onPress={() => openAlert('upcoming')} style={styles.upcomingHotspot} />
       <AlertHotspot accessibilityLabel="Appointment confirmed" onPress={() => openAlert('confirmed')} style={styles.confirmedHotspot} />
       <AlertHotspot accessibilityLabel="Reminder" onPress={() => openAlert('reminder')} style={styles.reminderHotspot} />
@@ -240,10 +269,16 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#0A376E', fontSize: 22, fontWeight: '800', lineHeight: 28 },
   headerSubtitle: { color: '#6580A3', fontSize: 15, lineHeight: 22, marginTop: 1 },
   markReadHotspot: { right: '3%', top: '5%', width: '27%', height: '7%' },
-  allFilterHotspot: { left: '4%', top: '16%', width: '17%', height: '6%' },
-  appointmentsFilterHotspot: { left: '22%', top: '16%', width: '29%', height: '6%' },
-  updatesFilterHotspot: { left: '52%', top: '16%', width: '23%', height: '6%' },
-  remindersFilterHotspot: { left: '76%', top: '16%', width: '21%', height: '6%' },
+  filterBarMask: { backgroundColor: '#FFFFFF', height: '7%', left: 0, position: 'absolute', right: 0, top: '15.1%', zIndex: 4 },
+  filterBar: { alignItems: 'center', flexDirection: 'row', height: '6%', justifyContent: 'space-between', left: '4%', position: 'absolute', right: '3%', top: '16%', zIndex: 5 },
+  filterChip: { alignItems: 'center', backgroundColor: '#F5F7FA', borderRadius: 24, height: '100%', justifyContent: 'center' },
+  activeFilterChip: { backgroundColor: '#DDEEFF' },
+  filterChipText: { color: '#173A68', fontSize: 13, fontWeight: '600', lineHeight: 17, textAlign: 'center' },
+  activeFilterChipText: { color: '#087EF5' },
+  allFilterChip: { width: '17%' },
+  appointmentsFilterChip: { width: '29%' },
+  updatesFilterChip: { width: '23%' },
+  remindersFilterChip: { width: '21%' },
   upcomingHotspot: { left: '4%', right: '3%', top: '24%', height: '11%' },
   confirmedHotspot: { left: '4%', right: '3%', top: '36%', height: '11%' },
   reminderHotspot: { left: '4%', right: '3%', top: '48%', height: '11%' },

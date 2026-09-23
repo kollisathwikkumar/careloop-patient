@@ -228,7 +228,7 @@ export default function HomeScreen(): JSX.Element {
       />
       <ActionHotspot accessibilityLabel="Request reschedule" onPress={() => setIsRescheduleVisible(true)} style={styles.rescheduleHotspot} />
       <ActionHotspot accessibilityLabel="Open care journey" onPress={() => router.replace('/journey')} style={styles.journeyHotspot} />
-      <ActionHotspot accessibilityLabel="Open doctor connection" onPress={() => showMessage('Your doctor', 'Dr. K. Sathwik is connected.')} style={styles.doctorHotspot} />
+      <ActionHotspot accessibilityLabel="Open your doctor profile" onPress={() => router.push('/doctor')} style={styles.doctorHotspot} />
       <ActionHotspot accessibilityLabel="Open reminder" onPress={() => showMessage('Reminder', 'Tomorrow at 10:30 AM.')} style={styles.reminderHotspot} />
       <View style={styles.bottomNav}>
         <ActionHotspot accessibilityLabel="Home" onPress={() => undefined} style={styles.navHotspot} />

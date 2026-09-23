@@ -2,13 +2,13 @@ VERIFICATION RECORD
 
 CHANGED_BRANCH: main
 CHANGED_FIELDS:
-- src/app/(tabs)/alerts.tsx: All/Appointments/Updates/Reminders now render the matching reference artwork and only their category rows.
-- src/app/(tabs)/alerts.tsx: forced image remount plus opaque white backing prevents stale All artwork from remaining after a filter change.
-- src/app/(tabs)/alerts.tsx: appointment overlay is restricted to All and Appointments, preserving Updates and Reminders text.
-- src/app/(tabs)/home.tsx: direct “I’ll attend” confirmation remains persisted and stays on Home.
-- src/app/(tabs)/journey.tsx and src/app/(tabs)/alert-detail.tsx: confirmed appointment state remains synchronized.
+- src/app/(tabs)/alerts.tsx: added a shared native FilterBar so All/Appointments/Updates/Reminders use one fixed 13px label style with line height 17 and allowFontScaling=false; a white mask hides the filter text baked into the screenshot backgrounds.
+- src/app/(tabs)/alerts.tsx: filter functionality and selected accessibility states remain working.
+- src/app/doctor.tsx: reduced Connected status pill remains intact.
+- src/app/(tabs)/home.tsx: “Your doctor” remains clickable and routes to /doctor.
+- src/app/(tabs)/journey.tsx and src/app/(tabs)/alert-detail.tsx: confirmed appointment remains synchronized.
 - src/lib/appointment.ts: typed AsyncStorage remains the shared appointment source of truth.
-- ROLLBACK.sh: isolated restoration verified.
+- ROLLBACK.sh: isolated restoration removes doctor.tsx and restores tracked sources.
 
 ARTIFACTS
 MODIFIED_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/src/app/(tabs)/alerts.tsx
@@ -17,22 +17,27 @@ VERIFICATION_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/V
 ROLLBACK_FILE=/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/ROLLBACK.sh
 
 MODIFIED_FILE_SHA256
-src/app/(tabs)/alerts.tsx 665f7a068c769442706cb333a4aeeb9555cc8e4f107aedc9852d248a7e0c8e7b
-src/app/(tabs)/home.tsx 819efe4a4c59f910fb86e6d2c4e3a7792c03f8d1242e5ca7f7e069a19df2f80d
+src/app/(tabs)/alerts.tsx dc31e7f26be07117c20865418c96193d5c21938f8c490e15c8e9f07cd25b6bfe
+src/app/doctor.tsx eb2f8fb23a86dc0a2bcbfc0186632cc7931662309b160b088d73118436cc1fa1
+src/app/(tabs)/home.tsx 05aeea389e3d582254df63ddee6fdf3966fbc518634cd63fa3a7233cf4b0ef81
 src/app/(tabs)/journey.tsx 71f5575ff81a0a505eef44fd4955ade662e9aaa1fcbe44ff90f4b12f73449a5b
 src/app/(tabs)/alert-detail.tsx 182e22e6e8689c39154bbcc53d5b082aef89fd45b64bdab69e635b3dd3c692b2
 src/lib/appointment.ts b59abcc5c5332ad2d7a40dc38a97dc63eb802717b5b87e1038111a740b5f5782
-ROLLBACK.sh 62977211ee620cd0f423ef35d2a5101aba867b48263506538edab8eacee73025
+ROLLBACK.sh f43ab50bc6176f53201867420a86646fc346a96323d3839f46713bce577ac417
+
+FILTER_FONT_BASELINE
+COPY: /tmp/careloop-alerts-before-filter-font-scale-tune.tsx
+SHA256: 85df3f088b94f15c60c94f7fb1b03200a728f07098a54c415c8098f85d0a5977
 
 BASELINE
 COMMAND: npx tsc --noEmit
-INPUT: copied current tree with HEAD versions of index.tsx, Home, Journey, Alerts, and alert-detail.tsx; auxiliary assets retained.
+INPUT: Alerts screen after shared filter-bar/mask implementation and before final 13px font-size scale adjustment.
 LITERAL_OUTPUT: [empty]
 RESULT: exit 0
 
 MODIFIED
 COMMAND: npx tsc --noEmit
-INPUT: current tree with working alert filters and synchronized appointment state.
+INPUT: current project with shared fixed filter typography at 13px and allowFontScaling=false.
 LITERAL_OUTPUT: [empty]
 RESULT: exit 0
 
@@ -59,21 +64,23 @@ env: export EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY EXPO_PUBLIC_SUPABASE_URL
 RESULT: exit 1; one existing error remains outside the changed files.
 
 ROLLBACK
-COMMAND: TARGET_ROOT="/tmp/careloop-rollback-alerts.vD0f3l" "/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/ROLLBACK.sh"
-INPUT: isolated copy of the current source tree.
+COMMAND: TARGET_ROOT="/tmp/careloop-alerts-rollback-filter-font.9oT6AF" "/Users/chipichipi/Documents/CareLoop Patient/CareLoopPatient/ROLLBACK.sh"
+INPUT: isolated copy containing the modified Alerts screen, doctor route, and Home doctor hotspot.
 LITERAL_OUTPUT: rollback copy restored
-RESULT: exit 0; isolated assertions exit 0, tracked source hashes matched HEAD, src/lib/appointment.ts was removed, and working files remained changed.
+RESULT: exit 0; assertions matched HEAD, Alerts and Home sources were restored, and doctor.tsx was removed.
+RESTORED_BEHAVIOR: tracked Alerts and Home sources matched HEAD; doctor route was absent in the isolated copy.
 
 SIMULATOR
 COMMAND: xcrun simctl openurl booted 'exp://127.0.0.1:8085/--/alerts'
-INPUT: iPhone 17 Pro Max simulator with the current Metro bundle.
+INPUT: iPhone 17 Pro Max current Metro bundle.
 LITERAL_OUTPUT: [empty]
-RESULT: route opened; then CUA filter checks visibly showed Appointments=3 cards, Updates=2 cards, Reminders=1 card, and All=6 cards.
+RESULT: Alerts opened with shared fixed filter typography; Appointments, Updates, Reminders, and All were selected successfully.
+SCREENSHOT: /tmp/careloop-alerts-filter-font-fixed.png
 
 ACCESSIBILITY
 Appointments: Upcoming appointment; Appointment confirmed; Appointment rescheduled.
 Updates: Message from care team; Care plan updated.
 Reminders: Reminder.
-All: Upcoming appointment; Appointment confirmed; Reminder; Appointment rescheduled; Message from care team; Care plan updated.
+All: all six alert rows.
 
-STATUS: filters are functional; filtered artwork matches the selected category; Reminders/Updates are no longer overwritten by the custom appointment overlay; TypeScript passes; diff check passes; lint has one existing unrelated error.
+STATUS: filter typography is shared across all filter states; TypeScript passes; diff check passes; lint has one existing unrelated error.

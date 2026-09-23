@@ -17,6 +17,7 @@ for file in "${RESTORE_FILES[@]}"; do
   git -C "$SCRIPT_DIR" show "HEAD:$file" > "$ROOT/$file"
 done
 
+rm -f "$ROOT/src/app/doctor.tsx"
 rm -f "$ROOT/src/lib/appointment.ts"
 rm -f "$ROOT/assets/images/careloop/"*-app.png
 rm -f "$ROOT/assets/images/careloop/logo-lockup-transparent.png"
