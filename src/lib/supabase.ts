@@ -18,7 +18,11 @@ if (!supabasePublishableKey) {
 
 export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
-    storage: AsyncStorage,
+    storage: typeof window === 'undefined' ? {
+      getItem: async (_key: string) => null,
+      setItem: async (_key: string, _value: string) => undefined,
+      removeItem: async (_key: string) => undefined,
+    } : AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

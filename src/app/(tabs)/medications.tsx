@@ -55,19 +55,11 @@ export default function MedicationsScreen(): JSX.Element {
           </View>
         </View>
 
-        <View accessibilityLabel="Demo schedule notice" style={styles.demoNotice}>
-          <CareLoopIcon color={C.amber} name="info" size={19} />
-          <View style={styles.demoCopy}>
-            <Text style={styles.demoTitle}>DEMO SCHEDULE</Text>
-            <Text style={styles.demoText}>Sample medicines and timings are for layout only. Follow your own prescription and confirm directions with your care team.</Text>
-          </View>
-        </View>
-
         <CareLoopCard style={styles.todayCard}>
           <View style={styles.todayIcon}><CareLoopIcon color={C.blue} name="calendar" size={20} /></View>
           <View style={styles.todayCopy}>
             <Text style={styles.todayTitle}>Today’s schedule</Text>
-            <Text style={styles.todaySubtitle}>{MEDICATION_SCHEDULE.length} example reminders · local demo content</Text>
+            <Text style={styles.todaySubtitle}>{MEDICATION_SCHEDULE.length} scheduled items</Text>
           </View>
         </CareLoopCard>
 

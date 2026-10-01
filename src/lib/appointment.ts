@@ -1,6 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getPatientAppPatient as getDemoPatient, patchPatientAppPatient as patchDemoPatient } from '@/lib/patient-backend';
 
-export type AppointmentStatus = 'confirmed' | 'reschedule-requested';
+export type AppointmentStatus = 'confirmed' | 'reschedule-requested' | 'awaiting-confirmation';
 
 export type AppointmentSchedule = Readonly<{
   date: string;
@@ -10,8 +10,8 @@ export type AppointmentSchedule = Readonly<{
 }>;
 
 export const DEFAULT_APPOINTMENT: AppointmentSchedule = {
-  date: '28 September 2026',
-  weekday: 'Monday',
+  date: '24 September 2026',
+  weekday: 'Thursday',
   time: '10:30 AM',
   status: 'confirmed',
 };
@@ -24,44 +24,35 @@ export const RESCHEDULE_DATES: readonly Pick<AppointmentSchedule, 'date' | 'week
 
 export const RESCHEDULE_TIMES: readonly string[] = ['10:30 AM', '2:00 PM', '4:30 PM'];
 
-const STORAGE_KEY = '@careloop/follow-up-appointment';
 let cachedAppointment: AppointmentSchedule = DEFAULT_APPOINTMENT;
 
 export function isAppointmentChanged(appointment: AppointmentSchedule): boolean {
   return appointment.date !== DEFAULT_APPOINTMENT.date || appointment.time !== DEFAULT_APPOINTMENT.time;
 }
 
-function isAppointmentStatus(value: string): value is AppointmentStatus {
-  return value === 'confirmed' || value === 'reschedule-requested';
-}
-
-function parseAppointment(value: string | null): AppointmentSchedule | null {
-  if (!value) {
-    return null;
-  }
-
-  const [date, weekday, time, status] = value.split('|');
-  if (!date || !weekday || !time || !status || !isAppointmentStatus(status)) {
-    return null;
-  }
-
-  return { date, weekday, time, status };
-}
-
-export async function loadAppointment(): Promise<AppointmentSchedule> {
+export async function loadAppointment(patientId = 'CL-1042'): Promise<AppointmentSchedule> {
   try {
-    const stored = parseAppointment(await AsyncStorage.getItem(STORAGE_KEY));
-    if (stored) {
-      cachedAppointment = stored;
-    }
+    const patient = await getDemoPatient(patientId);
+    cachedAppointment = {
+      date: patient.nextFollowup,
+      weekday: patient.weekday,
+      time: patient.time,
+      status: patient.response === 'Confirmed' ? 'confirmed' : patient.response === 'Reschedule requested' ? 'reschedule-requested' : 'awaiting-confirmation',
+    };
   } catch {
-    // The dashboard remains usable with the default appointment when storage is unavailable.
+    // The patient demo can still open when the local demo API is starting.
   }
 
   return cachedAppointment;
 }
 
-export async function saveAppointment(appointment: AppointmentSchedule): Promise<void> {
-  cachedAppointment = appointment;
-  await AsyncStorage.setItem(STORAGE_KEY, [appointment.date, appointment.weekday, appointment.time, appointment.status].join('|'));
+export async function saveAppointment(appointment: AppointmentSchedule, patientId = 'CL-1042'): Promise<void> {
+  const patient = await patchDemoPatient({
+    nextFollowup: appointment.date,
+    weekday: appointment.weekday,
+    time: appointment.time,
+    response: appointment.status === 'confirmed' ? 'Confirmed' : 'Reschedule requested',
+    status: appointment.status === 'confirmed' ? 'Confirmed' : 'Reschedule Requested',
+  }, patientId);
+  cachedAppointment = { date: patient.nextFollowup, weekday: patient.weekday, time: patient.time, status: appointment.status };
 }

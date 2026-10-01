@@ -13,34 +13,14 @@ export type PatientReport = {
 
 export const PATIENT_REPORTS: readonly PatientReport[] = [
   {
-    id: 'blood-panel-demo',
-    title: 'Blood test panel',
-    category: 'Lab test',
-    date: '21 September 2026',
-    clinician: 'Dr. K. Sathwik',
-    status: 'Available',
-    preview: 'Example report entry. Verified test results are not connected in this demo.',
-    fileName: 'blood-test-panel-demo.pdf',
-  },
-  {
-    id: 'imaging-demo',
-    title: 'Imaging report',
-    category: 'Imaging',
-    date: '18 September 2026',
-    clinician: 'City Care Hospital',
-    status: 'Available',
-    preview: 'Example imaging entry. Open the detail page to see the report layout.',
-    fileName: 'imaging-report-demo.pdf',
-  },
-  {
-    id: 'visit-summary-demo',
-    title: 'Follow-up visit summary',
+    id: 'ramesh-care-summary',
+    title: 'Diabetes care coordination summary',
     category: 'Visit summary',
-    date: '21 September 2026',
+    date: '13 August 2026',
     clinician: 'Dr. K. Sathwik',
     status: 'Available',
-    preview: 'Example visit summary. Patient-specific clinical notes are not connected.',
-    fileName: 'follow-up-summary-demo.pdf',
+    preview: 'Care coordination summary for Ramesh Kumar · CL-1042. Last recorded care activity: 13 August 2026. Next step: confirm the diabetes review with Dr. K. Sathwik.',
+    fileName: 'CL-1042-demo-report.pdf',
   },
 ];
 

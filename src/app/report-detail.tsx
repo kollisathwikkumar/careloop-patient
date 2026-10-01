@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type JSX } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CareLoopCard, CareLoopColors as C, CareLoopIcon, PatientAppFrame } from '@/components/careloop-ui';
+import { getPatientReportUrl } from '@/lib/patient-backend';
 import { PATIENT_REPORTS } from '@/lib/patient-records';
 
 export default function ReportDetailScreen(): JSX.Element {
@@ -24,11 +25,6 @@ export default function ReportDetailScreen(): JSX.Element {
 
         {report ? (
           <>
-            <View style={styles.demoNotice}>
-              <CareLoopIcon color={C.amber} name="info" size={19} />
-              <Text style={styles.demoText}>DEMO DATA · Example layout only. This is not a verified medical result.</Text>
-            </View>
-
             <CareLoopCard style={styles.reportHero}>
               <View style={styles.largeIcon}>
                 <CareLoopIcon name="reports" size={27} />
@@ -53,8 +49,18 @@ export default function ReportDetailScreen(): JSX.Element {
             <Text style={styles.sectionTitle}>Summary</Text>
             <CareLoopCard style={styles.summaryCard}>
               <Text style={styles.summaryText}>{report.preview}</Text>
-              <Text style={styles.summaryFootnote}>Your care team’s verified report and interpretation will appear here when connected.</Text>
+              <Text style={styles.summaryFootnote}>This coordination summary is also available to your care team.</Text>
             </CareLoopCard>
+
+            <Pressable accessibilityRole="button" onPress={() => {
+              void getPatientReportUrl(report.fileName).then((url) => {
+                if (!url) { Alert.alert('Report unavailable', 'The report is not available in your care-team records.'); return; }
+                return Linking.openURL(url);
+              }).catch(() => Alert.alert('Report unavailable', 'The report is not available in your care-team records.'));
+            }} style={styles.backToReports}>
+              <CareLoopIcon color="#FFFFFF" name="document" size={18} />
+              <Text style={styles.backToReportsText}>Open report PDF</Text>
+            </Pressable>
 
             <View style={styles.contactCard}>
               <CareLoopIcon color={C.blue} name="doctor" size={20} />
@@ -114,6 +120,6 @@ const styles = StyleSheet.create({
   contactText: { color: C.navy, flex: 1, fontSize: 11, lineHeight: 16 },
   notFoundCard: { alignItems: 'center', gap: 9, padding: 22 },
   notFoundTitle: { color: C.navyDeep, fontSize: 17, fontWeight: '800' },
-  backToReports: { alignItems: 'center', backgroundColor: C.blue, borderRadius: 15, marginTop: 3, minHeight: 42, justifyContent: 'center', paddingHorizontal: 16 },
+  backToReports: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: C.blue, borderRadius: 15, flexDirection: 'row', gap: 8, marginTop: 3, minHeight: 42, justifyContent: 'center', paddingHorizontal: 16 },
   backToReportsText: { color: C.surface, fontSize: 13, fontWeight: '700' },
 });

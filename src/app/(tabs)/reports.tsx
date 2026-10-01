@@ -44,18 +44,10 @@ export default function ReportsScreen(): JSX.Element {
           </View>
         </View>
 
-        <View accessibilityLabel="Demo data notice" style={styles.demoNotice}>
-          <CareLoopIcon color={C.amber} name="info" size={19} />
-          <View style={styles.demoCopy}>
-            <Text style={styles.demoTitle}>DEMO DATA</Text>
-            <Text style={styles.demoText}>These sample entries show the screen layout. They are not your medical results.</Text>
-          </View>
-        </View>
-
         <View style={styles.summaryRow}>
           <CareLoopCard style={styles.summaryCard}>
             <Text style={styles.summaryValue}>{PATIENT_REPORTS.length}</Text>
-            <Text style={styles.summaryLabel}>Sample reports</Text>
+            <Text style={styles.summaryLabel}>Available reports</Text>
           </CareLoopCard>
           <CareLoopCard style={styles.summaryCard}>
             <Text style={styles.summaryValue}>Ready</Text>
@@ -65,7 +57,7 @@ export default function ReportsScreen(): JSX.Element {
 
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>Your reports</Text>
-          <Text style={styles.sectionCount}>{PATIENT_REPORTS.length} examples</Text>
+          <Text style={styles.sectionCount}>{PATIENT_REPORTS.length} report</Text>
         </View>
 
         <View style={styles.reportList}>

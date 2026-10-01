@@ -1,0 +1,466 @@
+import { supabase } from '@/lib/supabase';
+
+export type StaffRole = 'admin' | 'doctor' | 'staff';
+export type AppointmentStatus = 'upcoming' | 'completed' | 'missed' | 'cancelled' | 'overdue';
+export type TestStatus = 'pending' | 'completed' | 'overdue';
+
+export type StaffProfile = {
+  id: string;
+  role: StaffRole;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  age: number | null;
+  specialty: string | null;
+  department: string | null;
+  workplace: string | null;
+  experience_years: number | null;
+  location: string | null;
+  staff_code: string;
+};
+
+export type Patient = {
+  id: string;
+  auth_user_id: string | null;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string | null;
+  phone: string | null;
+  email: string | null;
+  condition: string | null;
+  notes: string | null;
+  assigned_doctor_id: string | null;
+  assigned_staff_id: string | null;
+  created_at: string;
+};
+
+export type Appointment = {
+  id: string;
+  patient_id: string;
+  doctor_id: string | null;
+  scheduled_at: string;
+  purpose: string;
+  status: AppointmentStatus;
+  notes: string | null;
+};
+
+export type Test = {
+  id: string;
+  patient_id: string;
+  name: string;
+  test_date: string;
+  status: TestStatus;
+  notes: string | null;
+};
+
+export type Medication = {
+  id: string;
+  patient_id: string;
+  name: string;
+  dosage: string;
+  instructions: string;
+  start_date: string;
+  end_date: string | null;
+  status: 'current' | 'past';
+};
+
+export type CarePlan = {
+  id: string;
+  patient_id: string;
+  title: string;
+  goal: string;
+  actions: string;
+  responsible_profile_id: string | null;
+  review_date: string;
+  status: 'active' | 'completed' | 'paused';
+};
+
+export type FollowUpEvent = {
+  id: string;
+  patient_id: string;
+  appointment_id: string | null;
+  attempted_at: string;
+  outcome: string;
+  next_steps: string | null;
+};
+
+export type Report = {
+  id: string;
+  patient_id: string;
+  test_id: string;
+  file_path: string;
+  file_name: string;
+  mime_type: string | null;
+  created_at: string;
+};
+
+export type Group = {
+  id: string;
+  name: string;
+  description: string | null;
+  assigned_doctor_id: string | null;
+  assigned_staff_id: string | null;
+  created_by: string;
+};
+
+export type DashboardSummary = {
+  patients: number;
+  appointments: number;
+  followUpsDue: number;
+  overdueAppointments: number;
+  pendingTests: number;
+  recentUpdates: number;
+};
+
+// The patient application uses the connected Supabase project. The showcase
+// copy retains the demo mode separately for offline demonstrations.
+export const STAFF_DEMO_MODE = false;
+
+const DEMO_DOCTOR: StaffProfile = { id: 'demo-doctor', role: 'doctor', full_name: 'Dr. Priya Rao', email: 'priya.rao@citycare.example', phone: '+91 98765 43210', age: 38, specialty: 'General Medicine', department: 'Outpatient care', workplace: 'City Care Hospital', experience_years: 12, location: 'Hyderabad', staff_code: 'CL-DEMO01' };
+const DEMO_STAFF: StaffProfile = { id: 'demo-staff', role: 'staff', full_name: 'Ananya Menon', email: 'ananya.menon@citycare.example', phone: '+91 98765 43211', age: 31, specialty: null, department: 'Care coordination', workplace: 'City Care Hospital', experience_years: 6, location: 'Hyderabad', staff_code: 'CL-DEMO02' };
+let demoPatients: Patient[] = [
+  { id: 'demo-patient-1', auth_user_id: null, first_name: 'Asha', last_name: 'Sharma', date_of_birth: '1990-04-12', phone: '+91 98765 43001', email: 'asha.sharma@example.com', condition: 'Hypertension follow-up', notes: 'Monthly review required.', assigned_doctor_id: DEMO_DOCTOR.id, assigned_staff_id: DEMO_STAFF.id, created_at: '2026-09-20T09:00:00.000Z' },
+  { id: 'demo-patient-2', auth_user_id: null, first_name: 'Rahul', last_name: 'Verma', date_of_birth: '1985-11-03', phone: '+91 98765 43002', email: 'rahul.verma@example.com', condition: 'Diabetes review', notes: 'Awaiting HbA1c report.', assigned_doctor_id: DEMO_DOCTOR.id, assigned_staff_id: DEMO_STAFF.id, created_at: '2026-09-18T09:00:00.000Z' },
+];
+let demoAppointments: Appointment[] = [{ id: 'demo-appointment-1', patient_id: 'demo-patient-1', doctor_id: DEMO_DOCTOR.id, scheduled_at: '2026-09-28T10:30:00+05:30', purpose: 'Follow-up review', status: 'upcoming', notes: 'Bring recent readings.' }];
+let demoTests: Test[] = [{ id: 'demo-test-1', patient_id: 'demo-patient-2', name: 'HbA1c', test_date: '2026-09-25', status: 'pending', notes: 'Upload result after laboratory visit.' }];
+let demoReports: Report[] = [];
+let demoMedications: Medication[] = [{ id: 'demo-medication-1', patient_id: 'demo-patient-1', name: 'Amlodipine', dosage: '5 mg', instructions: 'Once after breakfast', start_date: '2026-09-01', end_date: null, status: 'current' }];
+let demoCarePlans: CarePlan[] = [{ id: 'demo-plan-1', patient_id: 'demo-patient-1', title: 'Recovery follow-up', goal: 'Maintain stable readings', actions: 'Weekly check-in and appointment review.', responsible_profile_id: DEMO_STAFF.id, review_date: '2026-10-15', status: 'active' }];
+let demoFollowUps: FollowUpEvent[] = [{ id: 'demo-follow-up-1', patient_id: 'demo-patient-1', appointment_id: 'demo-appointment-1', attempted_at: '2026-09-22T09:00:00.000Z', outcome: 'Patient confirmed attendance', next_steps: 'Review readings at appointment.' }];
+let demoGroups: Group[] = [{ id: 'demo-group-1', name: 'Monthly hypertension review', description: 'Patients needing monthly review.', assigned_doctor_id: DEMO_DOCTOR.id, assigned_staff_id: DEMO_STAFF.id, created_by: DEMO_STAFF.id }];
+
+function demoResult<T>(data: T) { return { data, error: null }; }
+
+export async function getCurrentStaff(): Promise<StaffProfile | null> {
+  if (STAFF_DEMO_MODE) return DEMO_STAFF;
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) return null;
+
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userData.user.id).maybeSingle();
+  if (error) throw error;
+  return (data as StaffProfile | null) ?? null;
+}
+
+export async function signUpStaff(input: {
+  accountType: 'doctor' | 'staff';
+  fullName: string;
+  email: string;
+  password: string;
+  phone: string;
+  age: number;
+  specialty?: string;
+  department?: string;
+  workplace: string;
+  experienceYears: number;
+  location: string;
+}) {
+  if (STAFF_DEMO_MODE) return demoResult({ user: { id: 'demo-staff' }, session: { user: { id: 'demo-staff' } } });
+  return supabase.auth.signUp({
+    email: input.email.trim().toLowerCase(),
+    password: input.password,
+    options: {
+      data: {
+        account_type: input.accountType,
+        full_name: input.fullName.trim(),
+        phone: input.phone.trim(),
+        age: String(input.age),
+        specialty: input.specialty?.trim() ?? '',
+        department: input.department?.trim() ?? '',
+        workplace: input.workplace.trim(),
+        experience_years: String(input.experienceYears),
+        location: input.location.trim(),
+      },
+    },
+  });
+}
+
+export async function signInStaff(email: string, password: string) {
+  if (STAFF_DEMO_MODE) return demoResult({ user: { id: 'demo-staff', email }, session: { user: { id: 'demo-staff', email } } });
+  return supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+}
+
+export async function signOutStaff() {
+  if (STAFF_DEMO_MODE) return demoResult(null);
+  return supabase.auth.signOut();
+}
+
+export async function listProfiles(): Promise<StaffProfile[]> {
+  if (STAFF_DEMO_MODE) return [DEMO_DOCTOR, DEMO_STAFF];
+  const { data, error } = await supabase.from('profiles').select('*').order('full_name');
+  if (error) throw error;
+  return (data ?? []) as StaffProfile[];
+}
+
+export async function listPatients(search = ''): Promise<Patient[]> {
+  if (STAFF_DEMO_MODE) {
+    const term = search.trim().toLowerCase();
+    return demoPatients.filter((patient) => !term || `${patient.first_name} ${patient.last_name} ${patient.phone} ${patient.condition}`.toLowerCase().includes(term));
+  }
+  let query = supabase.from('patients').select('*').order('created_at', { ascending: false });
+  if (search.trim()) {
+    const value = search.trim().replaceAll(',', ' ');
+    query = query.or(`first_name.ilike.%${value}%,last_name.ilike.%${value}%,phone.ilike.%${value}%,condition.ilike.%${value}%`);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as Patient[];
+}
+
+export async function getPatient(patientId: string): Promise<Patient> {
+  if (STAFF_DEMO_MODE) {
+    const patient = demoPatients.find((item) => item.id === patientId);
+    if (!patient) throw new Error('Patient not found.');
+    return patient;
+  }
+  const { data, error } = await supabase.from('patients').select('*').eq('id', patientId).single();
+  if (error) throw error;
+  return data as Patient;
+}
+
+export async function createPatient(input: Partial<Patient> & Pick<Patient, 'first_name' | 'last_name'>): Promise<Patient> {
+  if (STAFF_DEMO_MODE) {
+    const patient = { ...input, id: `demo-patient-${Date.now()}`, auth_user_id: input.auth_user_id ?? null, date_of_birth: input.date_of_birth ?? null, phone: input.phone ?? null, email: input.email ?? null, condition: input.condition ?? null, notes: input.notes ?? null, assigned_doctor_id: input.assigned_doctor_id ?? DEMO_DOCTOR.id, assigned_staff_id: input.assigned_staff_id ?? DEMO_STAFF.id, created_at: new Date().toISOString() } as Patient;
+    demoPatients = [patient, ...demoPatients];
+    return patient;
+  }
+  const { data, error } = await supabase.from('patients').insert(input).select().single();
+  if (error) throw error;
+  const patient = data as Patient;
+  await logActivity(patient.id, 'patient.created', 'patient', patient.id, `Created patient ${patient.first_name} ${patient.last_name}`);
+  return patient;
+}
+
+export async function updatePatient(patientId: string, input: Partial<Patient>): Promise<Patient> {
+  if (STAFF_DEMO_MODE) {
+    const index = demoPatients.findIndex((item) => item.id === patientId);
+    if (index < 0) throw new Error('Patient not found.');
+    demoPatients[index] = { ...demoPatients[index], ...input };
+    return demoPatients[index];
+  }
+  const { data, error } = await supabase.from('patients').update(input).eq('id', patientId).select().single();
+  if (error) throw error;
+  const patient = data as Patient;
+  await logActivity(patient.id, 'patient.updated', 'patient', patient.id, 'Updated patient record');
+  return patient;
+}
+
+export async function listAppointments(patientId?: string): Promise<Appointment[]> {
+  if (STAFF_DEMO_MODE) return demoAppointments.filter((appointment) => !patientId || appointment.patient_id === patientId);
+  let query = supabase.from('appointments').select('*').order('scheduled_at');
+  if (patientId) query = query.eq('patient_id', patientId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as Appointment[];
+}
+
+export async function createAppointment(input: Omit<Appointment, 'id'> & { created_by?: string }): Promise<Appointment> {
+  if (STAFF_DEMO_MODE) {
+    const appointment = { ...input, id: `demo-appointment-${Date.now()}` } as Appointment;
+    demoAppointments = [...demoAppointments, appointment];
+    return appointment;
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  const { data, error } = await supabase.from('appointments').insert({ ...input, created_by: userData.user?.id }).select().single();
+  if (error) throw error;
+  const appointment = data as Appointment;
+  await logActivity(appointment.patient_id, 'appointment.created', 'appointment', appointment.id, `Scheduled ${appointment.purpose}`);
+  return appointment;
+}
+
+export async function updateAppointment(id: string, patientId: string, input: Partial<Appointment>): Promise<Appointment> {
+  if (STAFF_DEMO_MODE) {
+    const index = demoAppointments.findIndex((item) => item.id === id);
+    if (index < 0) throw new Error('Appointment not found.');
+    demoAppointments[index] = { ...demoAppointments[index], ...input };
+    return demoAppointments[index];
+  }
+  const { data, error } = await supabase.from('appointments').update(input).eq('id', id).select().single();
+  if (error) throw error;
+  const appointment = data as Appointment;
+  await logActivity(patientId, 'appointment.updated', 'appointment', id, `Updated appointment to ${appointment.status}`);
+  return appointment;
+}
+
+export async function listTests(patientId: string): Promise<Test[]> {
+  if (STAFF_DEMO_MODE) return demoTests.filter((test) => test.patient_id === patientId);
+  const { data, error } = await supabase.from('tests').select('*').eq('patient_id', patientId).order('test_date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Test[];
+}
+
+export async function createTest(input: Omit<Test, 'id'>): Promise<Test> {
+  if (STAFF_DEMO_MODE) {
+    const test = { ...input, id: `demo-test-${Date.now()}` } as Test;
+    demoTests = [test, ...demoTests];
+    return test;
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  const { data, error } = await supabase.from('tests').insert({ ...input, created_by: userData.user?.id }).select().single();
+  if (error) throw error;
+  const test = data as Test;
+  await logActivity(test.patient_id, 'test.created', 'test', test.id, `Added test ${test.name}`);
+  return test;
+}
+
+export async function listReports(patientId: string): Promise<Report[]> {
+  if (STAFF_DEMO_MODE) return demoReports.filter((report) => report.patient_id === patientId);
+  const { data, error } = await supabase.from('reports').select('*').eq('patient_id', patientId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Report[];
+}
+
+export async function createReport(input: Omit<Report, 'id' | 'created_at'>): Promise<Report> {
+  if (STAFF_DEMO_MODE) {
+    const report = { ...input, id: `demo-report-${Date.now()}`, created_at: new Date().toISOString() } as Report;
+    demoReports = [report, ...demoReports];
+    return report;
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  const { data, error } = await supabase.from('reports').insert({ ...input, uploaded_by: userData.user?.id }).select().single();
+  if (error) throw error;
+  return data as Report;
+}
+
+export async function uploadReportFile(patientId: string, testId: string, file: File): Promise<Report> {
+  if (STAFF_DEMO_MODE) return createReport({ patient_id: patientId, test_id: testId, file_path: `demo://reports/${file.name}`, file_name: file.name, mime_type: file.type || null });
+  const filePath = `${patientId}/${testId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+  const { error: uploadError } = await supabase.storage.from('careloop-reports').upload(filePath, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+  if (uploadError) throw uploadError;
+  return createReport({ patient_id: patientId, test_id: testId, file_path: filePath, file_name: file.name, mime_type: file.type || null });
+}
+
+export async function getReportUrl(filePath: string): Promise<string> {
+  if (STAFF_DEMO_MODE) return filePath;
+  const { data, error } = await supabase.storage.from('careloop-reports').createSignedUrl(filePath, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function listMedications(patientId: string): Promise<Medication[]> {
+  if (STAFF_DEMO_MODE) return demoMedications.filter((medication) => medication.patient_id === patientId);
+  const { data, error } = await supabase.from('medications').select('*').eq('patient_id', patientId).order('status').order('start_date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Medication[];
+}
+
+export async function createMedication(input: Omit<Medication, 'id'>): Promise<Medication> {
+  if (STAFF_DEMO_MODE) {
+    const medication = { ...input, id: `demo-medication-${Date.now()}` } as Medication;
+    demoMedications = [medication, ...demoMedications];
+    return medication;
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  const { data, error } = await supabase.from('medications').insert({ ...input, created_by: userData.user?.id }).select().single();
+  if (error) throw error;
+  const medication = data as Medication;
+  await logActivity(medication.patient_id, 'medication.created', 'medication', medication.id, `Added medication ${medication.name}`);
+  return medication;
+}
+
+export async function listCarePlans(patientId: string): Promise<CarePlan[]> {
+  if (STAFF_DEMO_MODE) return demoCarePlans.filter((plan) => plan.patient_id === patientId);
+  const { data, error } = await supabase.from('care_plans').select('*').eq('patient_id', patientId).order('review_date');
+  if (error) throw error;
+  return (data ?? []) as CarePlan[];
+}
+
+export async function createCarePlan(input: Omit<CarePlan, 'id'>): Promise<CarePlan> {
+  if (STAFF_DEMO_MODE) {
+    const plan = { ...input, id: `demo-plan-${Date.now()}` } as CarePlan;
+    demoCarePlans = [plan, ...demoCarePlans];
+    return plan;
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  const { data, error } = await supabase.from('care_plans').insert({ ...input, created_by: userData.user?.id }).select().single();
+  if (error) throw error;
+  const plan = data as CarePlan;
+  await logActivity(plan.patient_id, 'care_plan.created', 'care_plan', plan.id, `Added care plan ${plan.title}`);
+  return plan;
+}
+
+export async function listFollowUps(patientId: string): Promise<FollowUpEvent[]> {
+  if (STAFF_DEMO_MODE) return demoFollowUps.filter((event) => event.patient_id === patientId);
+  const { data, error } = await supabase.from('follow_up_events').select('*').eq('patient_id', patientId).order('attempted_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as FollowUpEvent[];
+}
+
+export async function createFollowUp(input: Omit<FollowUpEvent, 'id' | 'attempted_at'> & { attempted_at?: string }): Promise<FollowUpEvent> {
+  if (STAFF_DEMO_MODE) {
+    const event = { ...input, id: `demo-follow-up-${Date.now()}`, attempted_at: input.attempted_at ?? new Date().toISOString() } as FollowUpEvent;
+    demoFollowUps = [event, ...demoFollowUps];
+    return event;
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  const { data, error } = await supabase.from('follow_up_events').insert({ ...input, attempted_at: input.attempted_at ?? new Date().toISOString(), recorded_by: userData.user?.id }).select().single();
+  if (error) throw error;
+  const event = data as FollowUpEvent;
+  await logActivity(event.patient_id, 'follow_up.created', 'follow_up', event.id, `Recorded follow-up: ${event.outcome}`);
+  return event;
+}
+
+export async function listGroups(): Promise<Group[]> {
+  if (STAFF_DEMO_MODE) return demoGroups;
+  const { data, error } = await supabase.from('patient_groups').select('*').order('name');
+  if (error) throw error;
+  return (data ?? []) as Group[];
+}
+
+export async function createGroup(input: Omit<Group, 'id' | 'created_by'>): Promise<Group> {
+  if (STAFF_DEMO_MODE) {
+    const group = { ...input, id: `demo-group-${Date.now()}`, created_by: DEMO_STAFF.id } as Group;
+    demoGroups = [...demoGroups, group];
+    return group;
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  const { data, error } = await supabase.from('patient_groups').insert({ ...input, created_by: userData.user?.id }).select().single();
+  if (error) throw error;
+  return data as Group;
+}
+
+export async function addPatientToGroup(groupId: string, patientId: string): Promise<void> {
+  if (STAFF_DEMO_MODE) return;
+  const { error } = await supabase.from('patient_group_members').upsert({ group_id: groupId, patient_id: patientId });
+  if (error) throw error;
+}
+
+export async function createConnectionInvitation(patientId: string): Promise<{ code: string; expires_at: string }> {
+  if (STAFF_DEMO_MODE) return { code: 'CL-DEMO24', expires_at: new Date(Date.now() + 86400000).toISOString() };
+  const { data: userData } = await supabase.auth.getUser();
+  const code = `CL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  const { data, error } = await supabase.from('connection_invitations').insert({ patient_id: patientId, code, created_by: userData.user?.id }).select('code, expires_at').single();
+  if (error) throw error;
+  return data as { code: string; expires_at: string };
+}
+
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  if (STAFF_DEMO_MODE) return { patients: demoPatients.length, appointments: demoAppointments.length, followUpsDue: 1, overdueAppointments: 0, pendingTests: demoTests.filter((test) => test.status !== 'completed').length, recentUpdates: 6 };
+  const [patients, appointments, tests, activity] = await Promise.all([
+    supabase.from('patients').select('id', { count: 'exact', head: true }),
+    supabase.from('appointments').select('id, status, scheduled_at'),
+    supabase.from('tests').select('id, status'),
+    supabase.from('activity_log').select('id', { count: 'exact', head: true }),
+  ]);
+  if (patients.error) throw patients.error;
+  if (appointments.error) throw appointments.error;
+  if (tests.error) throw tests.error;
+  if (activity.error) throw activity.error;
+  const appointmentRows = (appointments.data ?? []) as Pick<Appointment, 'status' | 'scheduled_at'>[];
+  const testRows = (tests.data ?? []) as Pick<Test, 'status'>[];
+  const now = Date.now();
+  return {
+    patients: patients.count ?? 0,
+    appointments: appointmentRows.length,
+    followUpsDue: appointmentRows.filter((row) => row.status === 'upcoming' && new Date(row.scheduled_at).getTime() - now < 7 * 86400000).length,
+    overdueAppointments: appointmentRows.filter((row) => row.status === 'overdue' || (row.status === 'upcoming' && new Date(row.scheduled_at).getTime() < now)).length,
+    pendingTests: testRows.filter((row) => row.status === 'pending' || row.status === 'overdue').length,
+    recentUpdates: activity.count ?? 0,
+  };
+}
+
+export async function logActivity(patientId: string | null, action: string, entityType: string, entityId: string | null, summary: string): Promise<void> {
+  if (STAFF_DEMO_MODE) return;
+  const { data: userData } = await supabase.auth.getUser();
+  await supabase.from('activity_log').insert({ patient_id: patientId, actor_id: userData.user?.id, action, entity_type: entityType, entity_id: entityId, summary });
+}

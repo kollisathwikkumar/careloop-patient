@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,7 +50,11 @@ export type CareLoopIconName =
   | 'help'
   | 'signOut'
   | 'info'
-  | 'appointment';
+  | 'appointment'
+  | 'phone'
+  | 'video'
+  | 'photo'
+  | 'send';
 
 const ICONS = {
   home: { ios: 'house.fill', android: 'home', web: 'home' },
@@ -76,6 +80,10 @@ const ICONS = {
   signOut: { ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' },
   info: { ios: 'info.circle.fill', android: 'info', web: 'info' },
   appointment: { ios: 'calendar.badge.clock', android: 'event', web: 'event' },
+  phone: { ios: 'phone.fill', android: 'call', web: 'call' },
+  video: { ios: 'video.fill', android: 'videocam', web: 'videocam' },
+  photo: { ios: 'photo', android: 'image', web: 'image' },
+  send: { ios: 'arrow.up', android: 'send', web: 'send' },
 } as const satisfies Record<CareLoopIconName, SymbolViewProps['name']>;
 
 export function CareLoopIcon({
@@ -105,15 +113,15 @@ export function CareLoopLogo({ compact = false }: { compact?: boolean }): ReactN
   );
 }
 
-type PatientTab = 'home' | 'journey' | 'alerts' | 'reports' | 'medications' | 'more';
+type PatientTab = 'home' | 'journey' | 'messages' | 'reports' | 'medications' | 'more';
 
-const TABS: readonly { key: PatientTab; label: string; href: '/home' | '/journey' | '/alerts' | '/reports' | '/medications' | '/more' }[] = [
-  { key: 'home', label: 'Home', href: '/home' },
-  { key: 'journey', label: 'Journey', href: '/journey' },
-  { key: 'alerts', label: 'Alerts', href: '/alerts' },
-  { key: 'reports', label: 'Reports', href: '/reports' },
-  { key: 'medications', label: 'Meds', href: '/medications' },
-  { key: 'more', label: 'More', href: '/more' },
+const TABS: readonly { key: PatientTab; icon: CareLoopIconName; label: string; href: Href }[] = [
+  { key: 'home', icon: 'home', label: 'Home', href: '/home' },
+  { key: 'journey', icon: 'journey', label: 'Journey', href: '/journey' },
+  { key: 'messages', icon: 'message', label: 'Messages', href: '/messages' as Href },
+  { key: 'reports', icon: 'reports', label: 'Reports', href: '/reports' },
+  { key: 'medications', icon: 'medications', label: 'Meds', href: '/medications' },
+  { key: 'more', icon: 'more', label: 'More', href: '/more' },
 ];
 
 export function PatientAppFrame({
@@ -144,7 +152,7 @@ export function PatientAppFrame({
               onPress={() => router.replace(tab.href)}
               style={styles.tab}
             >
-              <CareLoopIcon color={isSelected ? CareLoopColors.blue : CareLoopColors.secondary} name={tab.key} size={22} />
+              <CareLoopIcon color={isSelected ? CareLoopColors.blue : CareLoopColors.secondary} name={tab.icon} size={22} />
               <Text style={[styles.tabLabel, isSelected && styles.tabLabelSelected]}>{tab.label}</Text>
             </Pressable>
           );

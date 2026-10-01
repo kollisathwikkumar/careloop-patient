@@ -170,7 +170,7 @@ export default function AlertsScreen(): JSX.Element {
   );
 
   return (
-    <PatientAppFrame activeTab="alerts" backgroundColor={C.surface}>
+    <PatientAppFrame activeTab="messages" backgroundColor={C.surface}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Pressable accessibilityLabel="Back to Home" accessibilityRole="button" onPress={() => router.replace('/home')} style={styles.backButton}>
