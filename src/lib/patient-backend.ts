@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { decode } from 'base64-arraybuffer';
 
+import { decodeChatMessage, encodeChatMessage } from '@/lib/chat-message';
+import { parseAppointmentDate } from '@/lib/appointment-datetime';
 import { supabase } from '@/lib/supabase';
 
 export type PatientAppPatient = {
@@ -19,7 +22,7 @@ export type PatientAppPatient = {
   updatedAt: string;
 };
 
-export type PatientAppAttachment = { kind: 'image' | 'report'; name: string; mimeType: string; data: string };
+export type PatientAppAttachment = { kind: 'image' | 'report'; name: string; mimeType: string; data: string; filePath?: string };
 export type PatientAppMessage = { id: string; patientId: string; sender: 'patient' | 'care-team'; text: string; createdAt: string; attachment?: PatientAppAttachment };
 
 type PatientRow = {
@@ -48,7 +51,6 @@ type FollowUpRow = { outcome: string; next_steps: string | null; attempted_at: s
 type ActivityRow = { id: string; patient_id: string; actor_id: string | null; action: string; entity_type: string; entity_id: string | null; summary: string; created_at: string };
 
 const ACTIVE_PATIENT_KEY = '@careloop/active-patient.v1';
-const DEFAULT_PATIENT_ID = 'CL-1042';
 
 function formatDate(value: string | null): { date: string; weekday: string; time: string } {
   if (!value) return { date: 'Not scheduled', weekday: 'To be confirmed', time: 'To be confirmed' };
@@ -61,12 +63,6 @@ function formatDate(value: string | null): { date: string; weekday: string; time
   };
 }
 
-function parseAppointmentDate(date: string, time: string): string {
-  const parsed = new Date(`${date} ${time}`);
-  if (Number.isNaN(parsed.getTime())) throw new Error('The appointment date or time is invalid.');
-  return parsed.toISOString();
-}
-
 async function getAuthenticatedPatientId(): Promise<string | null> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) return null;
@@ -75,13 +71,16 @@ async function getAuthenticatedPatientId(): Promise<string | null> {
   return (data as { id: string } | null)?.id ?? null;
 }
 
+async function requireLinkedPatientId(): Promise<string> {
+  const patientId = await getAuthenticatedPatientId();
+  if (!patientId) throw new Error('Sign in and connect your care team to view patient records.');
+  return patientId;
+}
+
 export async function getActivePatientId(): Promise<string> {
-  const linkedPatientId = await getAuthenticatedPatientId();
-  if (linkedPatientId) {
-    await AsyncStorage.setItem(ACTIVE_PATIENT_KEY, linkedPatientId);
-    return linkedPatientId;
-  }
-  return (await AsyncStorage.getItem(ACTIVE_PATIENT_KEY)) ?? DEFAULT_PATIENT_ID;
+  const linkedPatientId = await requireLinkedPatientId();
+  await AsyncStorage.setItem(ACTIVE_PATIENT_KEY, linkedPatientId);
+  return linkedPatientId;
 }
 
 export async function setActivePatientId(patientId: string): Promise<void> {
@@ -91,7 +90,7 @@ export async function setActivePatientId(patientId: string): Promise<void> {
 async function loadPatient(patientId: string): Promise<PatientAppPatient> {
   const [patientResult, appointmentResult, planResult, followUpResult] = await Promise.all([
     supabase.from('patients').select('*').eq('id', patientId).single(),
-    supabase.from('appointments').select('id, patient_id, scheduled_at, status, purpose, notes').eq('patient_id', patientId).order('scheduled_at').limit(5),
+    supabase.from('appointments').select('id, patient_id, scheduled_at, status, purpose, notes').eq('patient_id', patientId).in('status', ['upcoming', 'overdue']).order('scheduled_at').limit(1),
     supabase.from('care_plans').select('actions').eq('patient_id', patientId).eq('status', 'active').order('review_date').limit(1),
     supabase.from('follow_up_events').select('outcome, next_steps, attempted_at').eq('patient_id', patientId).order('attempted_at', { ascending: false }).limit(1),
   ]);
@@ -102,7 +101,7 @@ async function loadPatient(patientId: string): Promise<PatientAppPatient> {
 
   const patient = patientResult.data as PatientRow;
   const appointments = (appointmentResult.data ?? []) as AppointmentRow[];
-  const appointment = appointments.find((item) => ['upcoming', 'overdue'].includes(item.status)) ?? appointments[0] ?? null;
+  const appointment = appointments[0] ?? null;
   const activePlan = ((planResult.data ?? []) as CarePlanRow[])[0] ?? null;
   const latestFollowUp = ((followUpResult.data ?? []) as FollowUpRow[])[0] ?? null;
   const profileIds = [patient.assigned_doctor_id, patient.assigned_staff_id].filter((id): id is string => Boolean(id));
@@ -133,75 +132,119 @@ async function loadPatient(patientId: string): Promise<PatientAppPatient> {
   };
 }
 
-export async function getPatientAppPatient(patientId = DEFAULT_PATIENT_ID): Promise<PatientAppPatient> {
-  const activePatientId = await getAuthenticatedPatientId();
-  return loadPatient(activePatientId ?? patientId);
+export async function getPatientAppPatient(patientId?: string): Promise<PatientAppPatient> {
+  const activePatientId = await requireLinkedPatientId();
+  if (patientId && patientId !== activePatientId) throw new Error('Patient access is not permitted.');
+  return loadPatient(activePatientId);
 }
 
 export async function getPatientAppPatients(): Promise<PatientAppPatient[]> {
-  const patientId = await getAuthenticatedPatientId();
-  if (!patientId) return [];
+  const patientId = await requireLinkedPatientId();
   return [await loadPatient(patientId)];
 }
 
 export async function patchPatientAppPatient(
   patch: Partial<Pick<PatientAppPatient, 'nextFollowup' | 'weekday' | 'time' | 'response' | 'status'>>,
-  patientId = DEFAULT_PATIENT_ID,
+  patientId?: string,
 ): Promise<PatientAppPatient> {
-  const activePatientId = (await getAuthenticatedPatientId()) ?? patientId;
+  const activePatientId = await requireLinkedPatientId();
+  if (patientId && patientId !== activePatientId) throw new Error('Patient access is not permitted.');
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) throw new Error('Sign in is required to update your appointment.');
-  const { data: appointmentData, error: appointmentError } = await supabase.from('appointments').select('id, patient_id, scheduled_at, status, purpose, notes').eq('patient_id', activePatientId).order('scheduled_at').limit(1).maybeSingle();
+  const { data: appointmentData, error: appointmentError } = await supabase.from('appointments').select('id, patient_id, scheduled_at, status, purpose, notes').eq('patient_id', activePatientId).in('status', ['upcoming', 'overdue']).order('scheduled_at').limit(1).maybeSingle();
   if (appointmentError) throw appointmentError;
 
-  const nextScheduledAt = patch.nextFollowup && patch.time ? parseAppointmentDate(patch.nextFollowup, patch.time) : null;
-  if (appointmentData) {
-    const update: { scheduled_at?: string; status?: string; notes?: string | null } = {};
-    if (nextScheduledAt) update.scheduled_at = nextScheduledAt;
-    if (patch.response === 'Confirmed') update.status = 'upcoming';
-    if (patch.response === 'Reschedule requested') update.status = 'upcoming';
-    if (Object.keys(update).length > 0) {
-      const { error } = await supabase.from('appointments').update(update).eq('id', (appointmentData as AppointmentRow).id).eq('patient_id', activePatientId);
-      if (error) throw error;
-    }
+  const nextScheduledAt = patch.response === 'Reschedule requested' && patch.nextFollowup && patch.time
+    ? parseAppointmentDate(patch.nextFollowup, patch.time)
+    : null;
+  if (!appointmentData && (patch.response === 'Confirmed' || patch.response === 'Reschedule requested')) {
+    throw new Error('There is no appointment available to respond to.');
   }
-
   if (patch.response === 'Confirmed' || patch.response === 'Reschedule requested') {
-    const outcome = patch.response === 'Confirmed' ? 'Patient confirmed attendance' : 'Reschedule requested';
-    const nextSteps = patch.response === 'Confirmed' ? 'Review readings at appointment.' : `Requested ${patch.nextFollowup ?? 'a new date'} at ${patch.time ?? 'a new time'}.`;
-    const { error } = await supabase.from('follow_up_events').insert({ patient_id: activePatientId, appointment_id: appointmentData ? (appointmentData as AppointmentRow).id : null, attempted_at: new Date().toISOString(), outcome, next_steps: nextSteps, recorded_by: userData.user.id });
+    const { error } = await supabase.rpc('respond_to_appointment', {
+      target_appointment_id: (appointmentData as AppointmentRow).id,
+      response: patch.response === 'Confirmed' ? 'confirmed' : 'reschedule_requested',
+      requested_scheduled_at: patch.response === 'Reschedule requested' ? nextScheduledAt : null,
+    });
     if (error) throw error;
   }
 
   return loadPatient(activePatientId);
 }
 
-export async function getPatientReportUrl(filePath = 'CL-1042-demo-report.pdf'): Promise<string | null> {
+export async function getPatientReportUrl(filePath: string): Promise<string | null> {
+  const patientId = await requireLinkedPatientId();
+  if (!filePath.startsWith(`${patientId}/`)) throw new Error('Report access is not permitted.');
   const { data, error } = await supabase.storage.from('careloop-reports').createSignedUrl(filePath, 3600);
   if (error) return null;
   return data.signedUrl;
 }
 
-export async function getPatientAppMessages(patientId = DEFAULT_PATIENT_ID): Promise<PatientAppMessage[]> {
-  const activePatientId = (await getAuthenticatedPatientId()) ?? patientId;
-  const { data: userData } = await supabase.auth.getUser();
-  const { data, error } = await supabase.from('activity_log').select('id, patient_id, actor_id, action, entity_type, entity_id, summary, created_at').eq('patient_id', activePatientId).eq('entity_type', 'message').order('created_at');
-  if (error) throw error;
-  return ((data ?? []) as ActivityRow[]).map((row) => ({
+export async function getPatientAppMessages(patientId?: string): Promise<PatientAppMessage[]> {
+  const activePatientId = await requireLinkedPatientId();
+  if (patientId && patientId !== activePatientId) throw new Error('Patient access is not permitted.');
+  const [{ data: userData }, messages, activity] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from('care_team_messages').select('id, patient_id, sender_id, body, created_at').eq('patient_id', activePatientId).order('created_at').limit(60),
+    supabase.from('activity_log').select('id, patient_id, actor_id, action, entity_type, entity_id, summary, created_at').eq('patient_id', activePatientId).eq('entity_type', 'message').order('created_at'),
+  ]);
+  if (messages.error) throw messages.error;
+  if (activity.error) throw activity.error;
+  const currentMessages = await Promise.all(((messages.data ?? []) as { id: string; patient_id: string; sender_id: string; body: string; created_at: string }[]).map(async (row) => {
+    const content = decodeChatMessage(row.body);
+    const attachmentUrl = content.attachment?.kind === 'image'
+      ? await getPatientReportUrl(content.attachment.filePath)
+      : null;
+    return {
+      id: row.id,
+      patientId: row.patient_id,
+      sender: row.sender_id === userData.user?.id ? 'patient' as const : 'care-team' as const,
+      text: content.text,
+      createdAt: row.created_at,
+      ...(content.attachment ? { attachment: { kind: content.attachment.kind, name: content.attachment.name, mimeType: content.attachment.mimeType, data: attachmentUrl ?? '', filePath: content.attachment.filePath } } : {}),
+    };
+  }));
+  const legacyMessages = ((activity.data ?? []) as ActivityRow[]).map((row) => ({
     id: row.id,
     patientId: row.patient_id,
-    sender: row.actor_id && row.actor_id === userData.user?.id ? 'patient' : 'care-team',
+    sender: row.actor_id && row.actor_id === userData.user?.id ? 'patient' as const : 'care-team' as const,
     text: row.summary,
     createdAt: row.created_at,
   }));
+  return [...currentMessages, ...legacyMessages].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 export async function sendPatientAppMessage(input: Omit<PatientAppMessage, 'id' | 'createdAt'>): Promise<PatientAppMessage> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) throw new Error('Sign in is required to send a message.');
-  const summary = input.text || (input.attachment ? `Attachment shared: ${input.attachment.name}` : 'Message sent');
-  const { data, error } = await supabase.from('activity_log').insert({ patient_id: input.patientId, actor_id: userData.user.id, action: 'message_sent', entity_type: 'message', entity_id: `message-${Date.now()}`, summary }).select('id, patient_id, actor_id, action, entity_type, entity_id, summary, created_at').single();
+  const patientId = await requireLinkedPatientId();
+  if (input.patientId !== patientId) throw new Error('Patient access is not permitted.');
+  let attachment: { kind: 'image' | 'report'; name: string; mimeType: string; filePath: string } | undefined;
+  if (input.attachment?.kind === 'report') {
+    const path = input.attachment.filePath;
+    if (!path?.startsWith(`${patientId}/`)) throw new Error('Choose a report from your connected care record.');
+    attachment = { kind: 'report', name: input.attachment.name, mimeType: input.attachment.mimeType, filePath: path };
+  } else if (input.attachment?.kind === 'image') {
+    const match = input.attachment.data.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+    if (!match) throw new Error('Choose a supported image (JPEG, PNG, or WebP).');
+    const bytes = decode(match[2]);
+    if (bytes.byteLength > 8 * 1024 * 1024) throw new Error('Images must be 8 MB or smaller.');
+    const extension = match[1] === 'image/jpeg' ? 'jpg' : match[1].split('/')[1];
+    const filePath = `${patientId}/messages/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from('careloop-reports').upload(filePath, bytes, {
+      contentType: match[1],
+      upsert: false,
+    });
+    if (uploadError) throw uploadError;
+    attachment = { kind: 'image', name: input.attachment.name, mimeType: match[1], filePath };
+  }
+  const body = encodeChatMessage({
+    text: input.text,
+    ...(attachment ? { attachment } : {}),
+  });
+  const { data, error } = await supabase.from('care_team_messages').insert({ patient_id: patientId, sender_id: userData.user.id, body }).select('id, patient_id, sender_id, body, created_at').single();
   if (error) throw error;
-  const row = data as ActivityRow;
-  return { id: row.id, patientId: row.patient_id, sender: 'patient', text: input.text, createdAt: row.created_at, ...(input.attachment ? { attachment: input.attachment } : {}) };
+  const row = data as { id: string; patient_id: string; sender_id: string; body: string; created_at: string };
+  const content = decodeChatMessage(row.body);
+  return { id: row.id, patientId: row.patient_id, sender: 'patient', text: content.text, createdAt: row.created_at, ...(input.attachment ? { attachment: input.attachment } : {}) };
 }

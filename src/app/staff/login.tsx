@@ -1,4 +1,5 @@
 import { Link, useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
@@ -28,7 +29,7 @@ export default function StaffLoginScreen() {
     const profile = await getCurrentStaff();
     setBusy(false);
     if (!profile) {
-      setMessage('Your account has no staff profile yet. Apply the Supabase migration and try again.');
+      setMessage('Your account is not activated for the care-team workspace yet. An organisation administrator must assign it to a care team.');
       return;
     }
     router.replace('/staff/dashboard');
@@ -38,7 +39,7 @@ export default function StaffLoginScreen() {
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.center}>
         <View style={styles.card}>
-          <Text style={styles.brand}>CareLoop</Text>
+          <View style={styles.brandRow}><View style={styles.brandIcon}><Ionicons name="heart-outline" size={20} color="#FFFFFF" /></View><Text style={styles.brand}>CareLoop</Text></View>
           <Text style={styles.eyebrow}>CARE-TEAM WORKSPACE</Text>
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>Sign in to manage patients, appointments, tests, and follow-ups.</Text>
@@ -55,15 +56,17 @@ export default function StaffLoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#F4F9FD', flex: 1 },
+  screen: { backgroundColor: STAFF_COLORS.pale, flex: 1 },
   center: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
-  card: { backgroundColor: '#FFFFFF', borderColor: '#DCE7F3', borderRadius: 24, borderWidth: 1, maxWidth: 480, padding: 34, width: '100%' },
-  brand: { color: STAFF_COLORS.navy, fontSize: 30, fontWeight: '800' },
-  eyebrow: { color: STAFF_COLORS.blue, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginTop: 25 },
-  title: { color: STAFF_COLORS.navy, fontSize: 32, fontWeight: '800', marginTop: 8 },
+  card: { backgroundColor: '#FFFFFF', borderColor: STAFF_COLORS.border, borderRadius: 20, borderWidth: 1, maxWidth: 480, padding: 36, width: '100%' },
+  brandRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  brandIcon: { alignItems: 'center', backgroundColor: STAFF_COLORS.blue, borderRadius: 10, height: 34, justifyContent: 'center', width: 34 },
+  brand: { color: STAFF_COLORS.navy, fontSize: 23, fontWeight: '800', letterSpacing: -0.6 },
+  eyebrow: { color: STAFF_COLORS.blue, fontSize: 10, fontWeight: '800', letterSpacing: 1.3, marginTop: 38 },
+  title: { color: STAFF_COLORS.navy, fontSize: 32, fontWeight: '800', letterSpacing: -1, marginTop: 9 },
   subtitle: { color: STAFF_COLORS.muted, fontSize: 15, lineHeight: 22, marginBottom: 22, marginTop: 8 },
   footerRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 22 },
   footerText: { color: STAFF_COLORS.muted, fontSize: 14 },
   link: { color: STAFF_COLORS.blue, fontSize: 14, fontWeight: '700' },
-  patientNote: { color: '#9AAEC5', fontSize: 12, lineHeight: 18, marginTop: 28 },
+  patientNote: { borderTopColor: STAFF_COLORS.border, borderTopWidth: 1, color: STAFF_COLORS.muted, fontSize: 11, lineHeight: 18, marginTop: 28, paddingTop: 17 },
 });

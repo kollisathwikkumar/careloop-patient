@@ -16,5 +16,10 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "artifacts/**",
+    "website-frontend/**",
+    ".demo-data/**"
   ]
 }

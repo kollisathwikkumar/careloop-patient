@@ -1,10 +1,13 @@
 import { useRouter } from 'expo-router';
-import { type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CareLoopCard, CareLoopColors as C, CareLoopIcon, PatientAppFrame } from '@/components/careloop-ui';
-import { PATIENT_REPORTS, type PatientReport } from '@/lib/patient-records';
+import type { PatientReport } from '@/lib/patient-records';
+import { loadLinkedPatientRecord } from '@/lib/patient';
 
-function ReportCard({ report, onPress }: { report: PatientReport; onPress: () => void }): JSX.Element {
+type LinkedReport = PatientReport & { filePath: string };
+
+function ReportCard({ report, onPress }: { report: LinkedReport; onPress: () => void }): JSX.Element {
   return (
     <Pressable accessibilityLabel={`View ${report.title} details`} accessibilityRole="button" onPress={onPress}>
       <CareLoopCard style={styles.reportCard}>
@@ -30,6 +33,32 @@ function ReportCard({ report, onPress }: { report: PatientReport; onPress: () =>
 
 export default function ReportsScreen(): JSX.Element {
   const router = useRouter();
+  const [reports, setReports] = useState<LinkedReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void loadLinkedPatientRecord().then((record) => {
+      if (!active) return;
+      const tests = new Map((record?.tests ?? []).map((test) => [test.id, test]));
+      setReports((record?.reports ?? []).map((report) => ({
+        id: report.id,
+        title: report.file_name,
+        category: tests.has(report.test_id) ? 'Lab test' : 'Visit summary',
+        date: new Date(report.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }),
+        clinician: 'Care team',
+        status: 'Available',
+        preview: tests.get(report.test_id)?.name ?? 'Shared by your care team.',
+        fileName: report.file_name,
+        filePath: report.file_path,
+      })));
+      setError(null);
+    }).catch((loadError: unknown) => {
+      if (active) setError(loadError instanceof Error ? loadError.message : 'Could not load your reports.');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   return (
     <PatientAppFrame activeTab="reports" backgroundColor={C.surface}>
@@ -46,22 +75,21 @@ export default function ReportsScreen(): JSX.Element {
 
         <View style={styles.summaryRow}>
           <CareLoopCard style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{PATIENT_REPORTS.length}</Text>
+            <Text style={styles.summaryValue}>{reports.length}</Text>
             <Text style={styles.summaryLabel}>Available reports</Text>
-          </CareLoopCard>
-          <CareLoopCard style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>Ready</Text>
-            <Text style={styles.summaryLabel}>Report details</Text>
           </CareLoopCard>
         </View>
 
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>Your reports</Text>
-          <Text style={styles.sectionCount}>{PATIENT_REPORTS.length} report</Text>
+          <Text style={styles.sectionCount}>{reports.length} {reports.length === 1 ? 'report' : 'reports'}</Text>
         </View>
 
+        {error ? <Text accessibilityRole="alert" style={styles.emptyCopy}>{error}</Text> : null}
+        {loading ? <Text style={styles.emptyCopy}>Loading your care-team reports…</Text> : null}
+        {!loading && !error && reports.length === 0 ? <Text style={styles.emptyCopy}>Reports shared by your care team will appear here.</Text> : null}
         <View style={styles.reportList}>
-          {PATIENT_REPORTS.map((report) => (
+          {reports.map((report) => (
             <ReportCard
               key={report.id}
               onPress={() => router.push({ pathname: '/report-detail', params: { id: report.id } })}
@@ -81,10 +109,6 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   title: { color: C.navyDeep, fontSize: 25, fontWeight: '800', lineHeight: 31 },
   subtitle: { color: C.secondary, fontSize: 13, lineHeight: 19, marginTop: 1 },
-  demoNotice: { alignItems: 'flex-start', backgroundColor: C.amberSurface, borderColor: '#F8E2BD', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 10, paddingHorizontal: 12, paddingVertical: 11 },
-  demoCopy: { flex: 1 },
-  demoTitle: { color: '#985900', fontSize: 10, fontWeight: '900', letterSpacing: 0.8, lineHeight: 14 },
-  demoText: { color: '#845E2B', fontSize: 11, lineHeight: 16, marginTop: 2 },
   summaryRow: { flexDirection: 'row', gap: 10 },
   summaryCard: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 74, padding: 10 },
   summaryValue: { color: C.navyDeep, fontSize: 17, fontWeight: '800', lineHeight: 22 },
@@ -93,6 +117,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: C.navy, fontSize: 17, fontWeight: '800', lineHeight: 22 },
   sectionCount: { color: C.secondary, fontSize: 11, fontWeight: '600' },
   reportList: { gap: 10 },
+  emptyCopy: { color: C.secondary, fontSize: 13, lineHeight: 19, paddingVertical: 10 },
   reportCard: { alignItems: 'flex-start', flexDirection: 'row', gap: 11, padding: 12 },
   reportIcon: { alignItems: 'center', backgroundColor: C.surfaceBlue, borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
   reportCopy: { flex: 1, minWidth: 0 },

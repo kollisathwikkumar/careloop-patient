@@ -1,13 +1,15 @@
 import type { Session } from '@supabase/supabase-js';
-import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import * as ExpoLinking from 'expo-linking';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -22,8 +24,10 @@ import { CareLoopIcon, CareLoopLogo as NativeCareLoopLogo } from '@/components/c
 import { ThemedText } from '@/components/themed-text';
 import { Fonts } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
+import { getPatientConnectivitySnapshot, redeemPatientConnection } from '@/lib/patient';
 
-type FlowStep = 'splash' | 'welcome' | 'qr' | 'code' | 'doctorConfirm' | 'connected' | 'phone' | 'otp';
+type FlowStep = 'splash' | 'welcome' | 'qr' | 'code' | 'doctorConfirm' | 'connected' | 'email';
+type PendingConnection = { code: string } | { qrPayload: string };
 
 type PrimaryButtonProps = {
   label: string;
@@ -182,7 +186,9 @@ function CareSymbol({ name, color, size = 22 }: { name: Parameters<typeof Symbol
   return <SymbolView name={name} size={size} tintColor={color} weight="semibold" />;
 }
 
-function QrConnectionScreen({ onBack, onCode, onScanned }: { onBack: () => void; onCode: () => void; onScanned: () => void }) {
+function QrConnectionScreen({ onBack, onCode, onScanned }: { onBack: () => void; onCode: () => void; onScanned: (payload: string) => void }) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
   return (
     <WaveBackdrop>
       <SafeAreaView style={styles.screenSafeArea}>
@@ -204,19 +210,29 @@ function QrConnectionScreen({ onBack, onCode, onScanned }: { onBack: () => void;
             <ScannerCorner position="topRight" />
             <ScannerCorner position="bottomLeft" />
             <ScannerCorner position="bottomRight" />
-            <View style={styles.scanGlyph}>
-              <View style={styles.scanGlyphTopLeft} />
-              <View style={styles.scanGlyphTopRight} />
-              <View style={styles.scanGlyphBottomLeft} />
-              <View style={styles.scanGlyphBottomRight} />
-            </View>
+            {permission?.granted ? (
+              <CameraView
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={scanned ? undefined : ({ data }) => {
+                  if (!data.startsWith('carelooppatient://connect?')) return;
+                  setScanned(true);
+                  onScanned(data);
+                }}
+                style={styles.cameraPreview}
+              />
+            ) : (
+              <Pressable accessibilityRole="button" onPress={() => void requestPermission()} style={styles.cameraPermission}>
+                <CareLoopIcon name="photo" size={35} />
+                <Text style={styles.cameraPermissionText}>{permission?.canAskAgain === false ? 'Allow camera access in Settings to scan a QR code' : 'Tap to allow camera access and scan your code'}</Text>
+              </Pressable>
+            )}
           </View>
 
           <View style={styles.qrActions}>
             <PrimaryButton
               label="Scan QR Code"
               icon="⌗"
-              onPress={onScanned}
+              onPress={() => { setScanned(false); void requestPermission(); }}
             />
             <PrimaryButton label="Enter connection code" onPress={onCode} variant="outline" />
           </View>
@@ -231,7 +247,7 @@ function ScannerCorner({ position }: { position: 'topLeft' | 'topRight' | 'botto
   return <View style={[styles.scannerCorner, styles[position]]} />;
 }
 
-function ConnectionCodeScreen({ onBack, onContinue }: { onBack: () => void; onContinue: () => void }) {
+function ConnectionCodeScreen({ onBack, onContinue }: { onBack: () => void; onContinue: (code: string) => void }) {
   const [code, setCode] = useState('');
   return (
     <WaveBackdrop>
@@ -261,7 +277,7 @@ function ConnectionCodeScreen({ onBack, onContinue }: { onBack: () => void; onCo
             />
             <PrimaryButton
               label="Continue"
-              onPress={onContinue}
+              onPress={() => onContinue(code.trim().toUpperCase())}
               disabled={!code.trim()}
             />
           </ScrollView>
@@ -281,7 +297,7 @@ function PlainScreen({ children }: { children: ReactNode }) {
   );
 }
 
-function DoctorConfirmationScreen({ onBack, onConnect, onCancel }: { onBack: () => void; onConnect: () => void; onCancel: () => void }) {
+function DoctorConfirmationScreen({ onBack, onConnect, onCancel, error, loading }: { onBack: () => void; onConnect: () => void; onCancel: () => void; error: string | null; loading: boolean }) {
   return (
     <PlainScreen>
       <SafeAreaView style={styles.screenSafeArea}>
@@ -294,11 +310,9 @@ function DoctorConfirmationScreen({ onBack, onConnect, onCancel }: { onBack: () 
             <ThemedText style={styles.headingNavy}>You are </ThemedText>
             <ThemedText style={styles.headingBlue}>connecting with</ThemedText>
           </ThemedText>
-          <Image contentFit="cover" source={require('@/assets/images/careloop/doctor-avatar.png')} style={styles.doctorAvatar} />
-          <ThemedText style={styles.doctorName}>Dr. K. Sathwik</ThemedText>
-          <ThemedText style={styles.doctorRole}>General Medicine</ThemedText>
-          <ThemedText style={styles.doctorHospital}>City Care Hospital</ThemedText>
-          <View style={styles.verifiedPill}><CareSymbol name="checkmark.seal.fill" color="#1685F1" size={18} /><ThemedText style={styles.verifiedText}>Verified Doctor</ThemedText></View>
+          <View style={styles.doctorAvatar}><CareLoopIcon color="#1685F1" name="doctor" size={42} /></View>
+          <ThemedText style={styles.doctorName}>Care team connection</ThemedText>
+          <ThemedText style={styles.doctorRole}>Review the care team details before sharing your record.</ThemedText>
 
           <View style={styles.permissionCard}>
             <ThemedText style={styles.permissionTitle}>This will allow your doctor to:</ThemedText>
@@ -307,7 +321,8 @@ function DoctorConfirmationScreen({ onBack, onConnect, onCancel }: { onBack: () 
             <PermissionRow icon="chart.bar.fill" tint="#6841E8" background="#EDE9FF" title="Keep track of your care journey" body="All your health information in one place" />
           </View>
           <View style={styles.confirmActions}>
-            <PrimaryButton label="Connect" icon="→" onPress={onConnect} />
+            {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
+            <PrimaryButton label={loading ? 'Connecting…' : 'Connect'} icon="→" onPress={onConnect} disabled={loading} />
             <PrimaryButton label="Cancel" onPress={onCancel} variant="outline" />
           </View>
           <View style={styles.secureFooter}><CareSymbol name="lock.fill" color="#6E89AE" size={14} /><ThemedText style={styles.secureFooterText}>Your information is secure and private.</ThemedText></View>
@@ -369,31 +384,25 @@ function AuthFormShell({ title, onBack, children }: { title: string; onBack: () 
   );
 }
 
-function PhoneScreen({ phone, onPhoneChange, onSend, onBack, loading, error }: { phone: string; onPhoneChange: (value: string) => void; onSend: () => void; onBack: () => void; loading: boolean; error: string | null }) {
+function EmailAuthScreen({ email, password, onEmailChange, onPasswordChange, onSubmit, onToggleMode, onBack, loading, error, isSignUp, notice }: { email: string; password: string; onEmailChange: (value: string) => void; onPasswordChange: (value: string) => void; onSubmit: () => void; onToggleMode: () => void; onBack: () => void; loading: boolean; error: string | null; isSignUp: boolean; notice: string | null }) {
   return (
-    <AuthFormShell title="Let’s get you connected" onBack={onBack}>
-      <ThemedText style={styles.formIntro}>Enter your mobile number. We’ll send you a one-time verification code.</ThemedText>
-      <ThemedText style={styles.inputLabel}>Mobile number</ThemedText>
-      <TextInput accessibilityLabel="Mobile number" autoComplete="tel" autoFocus keyboardType="phone-pad" onChangeText={onPhoneChange} placeholder="+91 98765 43210" placeholderTextColor="#6685AA" style={styles.textInput} value={phone} />
-      {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
-      <PrimaryButton label="Send code" onPress={onSend} disabled={loading} />
+    <AuthFormShell title={isSignUp ? 'Create your account' : 'Welcome back'} onBack={onBack}>
+      <ThemedText style={styles.formIntro}>Use your email to sign in securely, then connect to your care team.</ThemedText>
+      <ThemedText style={styles.inputLabel}>Email address</ThemedText>
+      <TextInput accessibilityLabel="Email address" autoCapitalize="none" autoComplete="email" autoFocus keyboardType="email-address" onChangeText={onEmailChange} placeholder="you@example.com" placeholderTextColor="#6685AA" style={styles.textInput} value={email} />
+      <ThemedText style={styles.inputLabel}>Password</ThemedText>
+      <TextInput accessibilityLabel="Password" autoComplete={isSignUp ? 'new-password' : 'current-password'} onChangeText={onPasswordChange} placeholder="At least 8 characters" placeholderTextColor="#6685AA" secureTextEntry style={styles.textInput} value={password} />
+      {notice ? <ThemedText style={styles.formIntro}>{notice}</ThemedText> : null}
+      {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
+      <PrimaryButton label={loading ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'} onPress={onSubmit} disabled={loading} />
+      <Pressable accessibilityRole="button" disabled={loading} onPress={onToggleMode} style={styles.authModeToggle}>
+        <ThemedText style={styles.authModeText}>{isSignUp ? 'Already have an account? Sign in' : 'New to CareLoop? Create an account'}</ThemedText>
+      </Pressable>
     </AuthFormShell>
   );
 }
 
-function OtpScreen({ phone, otp, onOtpChange, onVerify, onBack, loading, error }: { phone: string; otp: string; onOtpChange: (value: string) => void; onVerify: () => void; onBack: () => void; loading: boolean; error: string | null }) {
-  return (
-    <AuthFormShell title="Enter your code" onBack={onBack}>
-      <ThemedText style={styles.formIntro}>We sent a six-digit code to {phone}.</ThemedText>
-      <ThemedText style={styles.inputLabel}>Verification code</ThemedText>
-      <TextInput accessibilityLabel="Verification code" autoComplete="one-time-code" autoFocus keyboardType="number-pad" maxLength={6} onChangeText={onOtpChange} placeholder="000000" placeholderTextColor="#6685AA" style={[styles.textInput, styles.otpInput]} value={otp} />
-      {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
-      <PrimaryButton label="Verify and continue" onPress={onVerify} disabled={loading} />
-    </AuthFormShell>
-  );
-}
-
-function HomeScreen({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
+function HomeScreen({ session, onSignOut, onConnect }: { session: Session; onSignOut: () => void; onConnect: () => void }) {
   const firstName = useMemo(() => {
     const name = session.user.user_metadata?.full_name;
     return typeof name === 'string' && name.trim() ? name.split(' ')[0] : 'there';
@@ -403,7 +412,7 @@ function HomeScreen({ session, onSignOut }: { session: Session; onSignOut: () =>
       <SafeAreaView style={styles.screenSafeArea}>
         <ScrollView contentContainerStyle={styles.homeScroll}>
           <View style={styles.homeHeader}><View><ThemedText style={styles.eyebrow}>YOUR CARELOOP</ThemedText><ThemedText style={styles.homeTitle}>Hello, {firstName}</ThemedText></View><CareLoopLogo compact /></View>
-          <View style={styles.nextStepCard}><ThemedText style={styles.nextStepLabel}>YOUR NEXT STEP</ThemedText><ThemedText style={styles.nextStepTitle}>Connect your care team</ThemedText><ThemedText style={styles.nextStepBody}>Ask your doctor or care team for a secure connection code to get started.</ThemedText></View>
+          <View style={styles.nextStepCard}><ThemedText style={styles.nextStepLabel}>YOUR NEXT STEP</ThemedText><ThemedText style={styles.nextStepTitle}>Connect your care team</ThemedText><ThemedText style={styles.nextStepBody}>Scan your care team’s QR code or enter the temporary code they gave you.</ThemedText><View style={styles.homeConnectButton}><PrimaryButton label="Connect care team" onPress={onConnect} /></View></View>
           <ThemedText style={styles.sectionTitle}>Care Journey</ThemedText>
           <View style={styles.emptyJourneyCard}><ThemedText style={styles.emptyJourneyTitle}>Your journey starts here</ThemedText><ThemedText style={styles.emptyJourneyBody}>Once you connect with your care team, your follow-ups will appear here.</ThemedText></View>
           <Pressable accessibilityRole="button" onPress={onSignOut} style={styles.signOutButton}><ThemedText style={styles.signOutText}>Sign out</ThemedText></Pressable>
@@ -417,64 +426,122 @@ export default function HomeRoute() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [step, setStep] = useState<FlowStep>('splash');
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
+  const [isSignUp, setIsSignUp] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setStep('welcome'), 1600);
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (mounted && data.session) {
-        setSession(data.session);
-        router.replace('/home');
+    const inspectSession = async (): Promise<void> => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      if (!data.session) { setStep('welcome'); return; }
+      setSession(data.session);
+      try {
+        const connection = await getPatientConnectivitySnapshot();
+        if (mounted) {
+          if (connection) router.replace('/home');
+          else setStep('welcome');
+        }
+      } catch (snapshotError) {
+        if (mounted) { setError(snapshotError instanceof Error ? snapshotError.message : 'Could not load your care connection.'); setStep('welcome'); }
       }
-    });
+    };
+    void inspectSession();
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (mounted) {
-        setSession(nextSession);
-        if (nextSession) router.replace('/home');
-      }
+      if (!mounted) return;
+      setSession(nextSession);
+      if (!nextSession) { setStep('welcome'); return; }
+      void getPatientConnectivitySnapshot().then((connection) => {
+        if (!mounted) return;
+        if (connection) router.replace('/home');
+        else setStep('welcome');
+      }).catch((snapshotError: unknown) => {
+        if (mounted) { setError(snapshotError instanceof Error ? snapshotError.message : 'Could not load your care connection.'); setStep('welcome'); }
+      });
     });
-    return () => { mounted = false; clearTimeout(timer); data.subscription.unsubscribe(); };
+    const handleAuthLink = async (url: string | null): Promise<void> => {
+      if (!url) return;
+      const parsed = ExpoLinking.parse(url);
+      if (parsed.path !== 'auth/callback' && parsed.path !== '/auth/callback') return;
+      const code = typeof parsed.queryParams?.code === 'string' ? parsed.queryParams.code : null;
+      if (!code) return;
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError && mounted) setError(exchangeError.message);
+    };
+    void Linking.getInitialURL().then((url) => handleAuthLink(url));
+    const linkSubscription = Linking.addEventListener('url', ({ url }) => { void handleAuthLink(url); });
+    return () => { mounted = false; data.subscription.unsubscribe(); linkSubscription.remove(); };
   }, [router]);
 
-  const requestOtp = async (): Promise<void> => {
+  const authenticate = async (): Promise<void> => {
     setError(null);
-    const normalizedPhone = phone.replace(/[\s()-]/g, '');
-    if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) { setError('Enter your full mobile number with country code.'); return; }
+    setNotice(null);
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) { setError('Enter a valid email address.'); return; }
+    if (password.length < 8) { setError('Use a password with at least 8 characters.'); return; }
     setLoading(true);
-    const { error: requestError } = await supabase.auth.signInWithOtp({ phone: normalizedPhone });
-    setLoading(false);
-    if (requestError) { setError(requestError.message); return; }
-    setPhone(normalizedPhone); setStep('otp');
-  };
-
-  const verifyOtp = async (): Promise<void> => {
-    setError(null);
-    if (!/^\d{6}$/.test(otp)) { setError('Enter the six-digit code we sent to your phone.'); return; }
-    setLoading(true);
-    const { data, error: verifyError } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' });
-    setLoading(false);
-    if (verifyError) { setError(verifyError.message); return; }
-    setSession(data.session);
-    router.replace('/home');
+    try {
+      if (isSignUp) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: { emailRedirectTo: ExpoLinking.createURL('auth/callback') },
+        });
+        if (signUpError) throw signUpError;
+        if (!data.session) {
+          setNotice('Account created. Confirm the email sent by Supabase, then return here to sign in.');
+          setIsSignUp(false);
+          return;
+        }
+        setSession(data.session);
+        setStep('qr');
+      } else {
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+        if (signInError) throw signInError;
+        setSession(data.session);
+        const connection = await getPatientConnectivitySnapshot();
+        if (connection) router.replace('/home');
+        else setStep('qr');
+      }
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : 'Authentication failed. Try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async (): Promise<void> => { await supabase.auth.signOut(); setSession(null); setStep('welcome'); };
-  const go = (next: FlowStep): void => { setError(null); setStep(next); };
+  const go = (next: FlowStep): void => { setError(null); setNotice(null); setStep(next); };
   const openHome = (): void => { router.replace('/home'); };
+  const startConnection = (): void => { setPendingConnection(null); setError(null); setStep('qr'); };
+  const chooseCode = (code: string): void => { setPendingConnection({ code }); setError(null); setStep('doctorConfirm'); };
+  const chooseQr = (qrPayload: string): void => { setPendingConnection({ qrPayload }); setError(null); setStep('doctorConfirm'); };
+  const confirmConnection = async (): Promise<void> => {
+    if (!pendingConnection) { setError('Scan a QR code or enter a connection code first.'); return; }
+    setLoading(true); setError(null);
+    try {
+      await redeemPatientConnection(pendingConnection);
+      setStep('connected');
+    } catch (connectionError) {
+      setError(connectionError instanceof Error ? connectionError.message : 'Could not connect. Check the code and try again.');
+    } finally { setLoading(false); }
+  };
 
-  if (session) return <HomeScreen session={session} onSignOut={signOut} />;
-  if (step === 'splash') return <SplashScreenView />;
-  if (step === 'welcome') return <WelcomeScreen onGetStarted={() => go('qr')} onSignIn={() => go('phone')} />;
-  if (step === 'qr') return <QrConnectionScreen onBack={() => go('welcome')} onCode={() => go('code')} onScanned={() => go('doctorConfirm')} />;
-  if (step === 'code') return <ConnectionCodeScreen onBack={() => go('qr')} onContinue={() => go('doctorConfirm')} />;
-  if (step === 'doctorConfirm') return <DoctorConfirmationScreen onBack={() => go('code')} onCancel={() => go('qr')} onConnect={() => go('connected')} />;
+  if (step === 'splash' && !session) return <SplashScreenView />;
+  if (session && step === 'welcome') return <HomeScreen session={session} onSignOut={() => void signOut()} onConnect={startConnection} />;
+  if (step === 'welcome') return <WelcomeScreen onGetStarted={() => { setIsSignUp(true); go('email'); }} onSignIn={() => { setIsSignUp(false); go('email'); }} />;
+  if (step === 'email') return <EmailAuthScreen email={email} password={password} onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={() => void authenticate()} onToggleMode={() => { setIsSignUp(!isSignUp); setNotice(null); setError(null); }} onBack={() => go('welcome')} loading={loading} error={error} isSignUp={isSignUp} notice={notice} />;
+  if (step === 'qr') return <QrConnectionScreen onBack={() => go(session ? 'welcome' : 'email')} onCode={() => go('code')} onScanned={chooseQr} />;
+  if (step === 'code') return <ConnectionCodeScreen onBack={() => go('qr')} onContinue={chooseCode} />;
+  if (step === 'doctorConfirm') return <DoctorConfirmationScreen onBack={() => go(pendingConnection && 'code' in pendingConnection ? 'code' : 'qr')} onCancel={() => go('qr')} onConnect={() => void confirmConnection()} error={error} loading={loading} />;
   if (step === 'connected') return <ConnectedScreen onContinue={openHome} onHome={openHome} />;
-  if (step === 'phone') return <PhoneScreen error={error} loading={loading} onBack={() => go('welcome')} onPhoneChange={setPhone} onSend={requestOtp} phone={phone} />;
-  return <OtpScreen error={error} loading={loading} onBack={() => go('phone')} onOtpChange={setOtp} onVerify={verifyOtp} otp={otp} phone={phone} />;
+  if (session) return <HomeScreen session={session} onSignOut={() => void signOut()} onConnect={startConnection} />;
+  return <WelcomeScreen onGetStarted={() => { setIsSignUp(true); go('email'); }} onSignIn={() => { setIsSignUp(false); go('email'); }} />;
 }
 
 const styles = StyleSheet.create({
@@ -551,13 +618,9 @@ const styles = StyleSheet.create({
   confirmScroll: { paddingHorizontal: 26, paddingTop: 0, paddingBottom: 10, alignItems: 'center' },
   confirmTopBar: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
   confirmHeading: { textAlign: 'center', width: '100%', fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -1.2, marginBottom: 20 },
-  doctorAvatar: { width: 150, height: 150, borderRadius: 75, marginBottom: 8 },
+  doctorAvatar: { width: 88, height: 88, borderRadius: 44, marginBottom: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E5F3FF' },
   doctorName: { color: '#123B80', fontSize: 27, lineHeight: 32, fontWeight: '800', textAlign: 'center' },
   doctorRole: { color: '#5878A2', fontSize: 17, lineHeight: 22, marginTop: 1, textAlign: 'center' },
-  doctorHospital: { color: '#6685AA', fontSize: 15, lineHeight: 20, marginTop: 4, textAlign: 'center' },
-  verifiedPill: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E5F3FF', borderRadius: 24, paddingHorizontal: 18, paddingVertical: 8, marginTop: 10 },
-  verifiedIcon: { color: '#1685F1', fontSize: 18, fontWeight: '800' },
-  verifiedText: { color: '#1685F1', fontSize: 15, fontWeight: '600' },
   permissionCard: { width: '100%', borderWidth: 1.5, borderColor: '#D4ECFF', borderRadius: 20, padding: 15, marginTop: 18, marginBottom: 18 },
   permissionTitle: { color: '#123B80', fontSize: 18, lineHeight: 23, fontWeight: '800', marginBottom: 2 },
   permissionRow: { flexDirection: 'row', alignItems: 'center', marginTop: 15 },
@@ -593,6 +656,12 @@ const styles = StyleSheet.create({
   textInput: { minHeight: 60, borderWidth: 1.5, borderColor: '#35AFFF', borderRadius: 18, paddingHorizontal: 20, color: '#123B80', fontSize: 18, fontFamily: Fonts.sans, marginBottom: 20, backgroundColor: 'rgba(247,252,255,0.8)' },
   otpInput: { textAlign: 'center', letterSpacing: 12, fontFamily: Fonts.mono },
   errorText: { color: '#B33A32', fontSize: 14, lineHeight: 20, marginBottom: 16 },
+  cameraPreview: { width: '100%', height: '100%', borderRadius: 18, overflow: 'hidden' },
+  cameraPermission: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', padding: 26, gap: 14 },
+  cameraPermissionText: { color: '#5878A2', fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  authModeToggle: { alignItems: 'center', padding: 18 },
+  authModeText: { color: '#1269C9', fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  homeConnectButton: { marginTop: 20 },
   homeScroll: { paddingHorizontal: 26, paddingTop: 22, paddingBottom: 110 },
   homeHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 26 },
   eyebrow: { color: '#5878A2', fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },

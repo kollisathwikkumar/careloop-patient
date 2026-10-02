@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
-export type StaffRole = 'admin' | 'doctor' | 'staff';
+export type StaffRole = 'doctor' | 'staff' | 'care_coordinator' | 'org_admin' | 'platform_admin';
+export type StaffInvitationRole = 'doctor' | 'staff' | 'care_coordinator' | 'org_admin';
 export type AppointmentStatus = 'upcoming' | 'completed' | 'missed' | 'cancelled' | 'overdue';
 export type TestStatus = 'pending' | 'completed' | 'overdue';
 
@@ -112,9 +113,48 @@ export type DashboardSummary = {
   recentUpdates: number;
 };
 
+export type FollowUpQueueItem = {
+  task_id: string;
+  patient_id: string;
+  patient_code: string | null;
+  patient_first_name: string;
+  patient_last_name: string;
+  appointment_id: string | null;
+  appointment_scheduled_at: string | null;
+  appointment_status: AppointmentStatus | null;
+  reason: string;
+  due_at: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  priority_source: string;
+  owner_id: string | null;
+  owner_name: string | null;
+  status: 'open' | 'in_progress' | 'completed' | 'cancelled';
+  next_action: string;
+  is_overdue: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StaffChatMessage = {
+  id: string;
+  patient_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+};
+
 // The patient application uses the connected Supabase project. The showcase
 // copy retains the demo mode separately for offline demonstrations.
 export const STAFF_DEMO_MODE = false;
+
+const STAFF_ROLES: readonly StaffRole[] = ['doctor', 'staff', 'care_coordinator', 'org_admin', 'platform_admin'];
+
+function getStaffAuthRedirectUrl(): string | undefined {
+  const configuredUrl = process.env.EXPO_PUBLIC_STAFF_AUTH_REDIRECT_URL?.trim();
+  if (configuredUrl) return configuredUrl;
+  if (typeof window !== 'undefined' && window.location.origin) return `${window.location.origin}/staff/dashboard`;
+  return undefined;
+}
 
 const DEMO_DOCTOR: StaffProfile = { id: 'demo-doctor', role: 'doctor', full_name: 'Dr. Priya Rao', email: 'priya.rao@citycare.example', phone: '+91 98765 43210', age: 38, specialty: 'General Medicine', department: 'Outpatient care', workplace: 'City Care Hospital', experience_years: 12, location: 'Hyderabad', staff_code: 'CL-DEMO01' };
 const DEMO_STAFF: StaffProfile = { id: 'demo-staff', role: 'staff', full_name: 'Ananya Menon', email: 'ananya.menon@citycare.example', phone: '+91 98765 43211', age: 31, specialty: null, department: 'Care coordination', workplace: 'City Care Hospital', experience_years: 6, location: 'Hyderabad', staff_code: 'CL-DEMO02' };
@@ -129,6 +169,10 @@ let demoMedications: Medication[] = [{ id: 'demo-medication-1', patient_id: 'dem
 let demoCarePlans: CarePlan[] = [{ id: 'demo-plan-1', patient_id: 'demo-patient-1', title: 'Recovery follow-up', goal: 'Maintain stable readings', actions: 'Weekly check-in and appointment review.', responsible_profile_id: DEMO_STAFF.id, review_date: '2026-10-15', status: 'active' }];
 let demoFollowUps: FollowUpEvent[] = [{ id: 'demo-follow-up-1', patient_id: 'demo-patient-1', appointment_id: 'demo-appointment-1', attempted_at: '2026-09-22T09:00:00.000Z', outcome: 'Patient confirmed attendance', next_steps: 'Review readings at appointment.' }];
 let demoGroups: Group[] = [{ id: 'demo-group-1', name: 'Monthly hypertension review', description: 'Patients needing monthly review.', assigned_doctor_id: DEMO_DOCTOR.id, assigned_staff_id: DEMO_STAFF.id, created_by: DEMO_STAFF.id }];
+const DEMO_FOLLOW_UP_QUEUE: FollowUpQueueItem[] = [
+  { task_id: 'demo-task-1', patient_id: 'demo-patient-1', patient_code: 'CL-001', patient_first_name: 'Asha', patient_last_name: 'Sharma', appointment_id: 'demo-appointment-1', appointment_scheduled_at: '2026-09-28T10:30:00+05:30', appointment_status: 'upcoming', reason: 'Monthly review is due', due_at: '2026-10-02T09:00:00+05:30', priority: 'high', priority_source: 'upcoming_review', owner_id: DEMO_DOCTOR.id, owner_name: DEMO_DOCTOR.full_name, status: 'open', next_action: 'Call patient and confirm readings', is_overdue: false, created_at: '2026-09-28T09:00:00.000Z', updated_at: '2026-09-28T09:00:00.000Z' },
+  { task_id: 'demo-task-2', patient_id: 'demo-patient-2', patient_code: 'CL-002', patient_first_name: 'Rahul', patient_last_name: 'Verma', appointment_id: null, appointment_scheduled_at: null, appointment_status: null, reason: 'Investigation result needs review', due_at: '2026-09-30T09:00:00+05:30', priority: 'urgent', priority_source: 'pending_investigation', owner_id: DEMO_DOCTOR.id, owner_name: DEMO_DOCTOR.full_name, status: 'in_progress', next_action: 'Review HbA1c report when received', is_overdue: true, created_at: '2026-09-27T09:00:00.000Z', updated_at: '2026-09-30T09:00:00.000Z' },
+];
 
 function demoResult<T>(data: T) { return { data, error: null }; }
 
@@ -137,7 +181,7 @@ export async function getCurrentStaff(): Promise<StaffProfile | null> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) return null;
 
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userData.user.id).maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userData.user.id).in('role', [...STAFF_ROLES]).eq('active', true).maybeSingle();
   if (error) throw error;
   return (data as StaffProfile | null) ?? null;
 }
@@ -156,10 +200,12 @@ export async function signUpStaff(input: {
   location: string;
 }) {
   if (STAFF_DEMO_MODE) return demoResult({ user: { id: 'demo-staff' }, session: { user: { id: 'demo-staff' } } });
+  const emailRedirectTo = getStaffAuthRedirectUrl();
   return supabase.auth.signUp({
     email: input.email.trim().toLowerCase(),
     password: input.password,
     options: {
+      ...(emailRedirectTo ? { emailRedirectTo } : {}),
       data: {
         account_type: input.accountType,
         full_name: input.fullName.trim(),
@@ -175,6 +221,16 @@ export async function signUpStaff(input: {
   });
 }
 
+export async function resendStaffConfirmation(email: string) {
+  if (STAFF_DEMO_MODE) return demoResult(null);
+  const emailRedirectTo = getStaffAuthRedirectUrl();
+  return supabase.auth.resend({
+    type: 'signup',
+    email: email.trim().toLowerCase(),
+    ...(emailRedirectTo ? { options: { emailRedirectTo } } : {}),
+  });
+}
+
 export async function signInStaff(email: string, password: string) {
   if (STAFF_DEMO_MODE) return demoResult({ user: { id: 'demo-staff', email }, session: { user: { id: 'demo-staff', email } } });
   return supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
@@ -183,6 +239,30 @@ export async function signInStaff(email: string, password: string) {
 export async function signOutStaff() {
   if (STAFF_DEMO_MODE) return demoResult(null);
   return supabase.auth.signOut();
+}
+
+export async function createStaffInvitation(input: {
+  careTeamId: string;
+  email: string;
+  role: StaffInvitationRole;
+  ttlHours?: number;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('create_staff_invitation', {
+    target_care_team_id: input.careTeamId,
+    target_email: input.email.trim().toLowerCase(),
+    target_role: input.role,
+    invitation_ttl_hours: input.ttlHours ?? 72,
+  });
+  if (error) throw error;
+  return String(data);
+}
+
+export async function acceptStaffInvitation(token: string): Promise<string> {
+  const normalizedToken = token.trim();
+  if (normalizedToken.length < 32) throw new Error('Enter a valid staff invitation token.');
+  const { data, error } = await supabase.rpc('accept_staff_invitation', { invitation_token: normalizedToken });
+  if (error) throw error;
+  return String(data);
 }
 
 export async function listProfiles(): Promise<StaffProfile[]> {
@@ -330,6 +410,33 @@ export async function uploadReportFile(patientId: string, testId: string, file: 
   return createReport({ patient_id: patientId, test_id: testId, file_path: filePath, file_name: file.name, mime_type: file.type || null });
 }
 
+export async function listStaffChatMessages(patientId: string): Promise<StaffChatMessage[]> {
+  const [messages, legacy] = await Promise.all([
+    supabase.from('care_team_messages').select('id, patient_id, sender_id, body, created_at').eq('patient_id', patientId).order('created_at', { ascending: true }).limit(60),
+    supabase.from('activity_log').select('id, patient_id, actor_id, summary, created_at').eq('patient_id', patientId).eq('entity_type', 'message').order('created_at', { ascending: true }).limit(60),
+  ]);
+  if (messages.error) throw messages.error;
+  if (legacy.error) throw legacy.error;
+  const current = (messages.data ?? []) as StaffChatMessage[];
+  const prior = ((legacy.data ?? []) as { id: string; patient_id: string; actor_id: string | null; summary: string; created_at: string }[])
+    .map((row): StaffChatMessage => ({ id: `legacy-${row.id}`, patient_id: row.patient_id, sender_id: row.actor_id ?? '', body: row.summary, created_at: row.created_at }));
+  return [...current, ...prior].sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-60);
+}
+
+export async function sendStaffChatMessage(patientId: string, body: string): Promise<StaffChatMessage> {
+  const trimmedBody = body.trim();
+  if (!trimmedBody) throw new Error('Write a message or attach a report first.');
+  if (trimmedBody.length > 4000) throw new Error('Message must be 4,000 characters or fewer.');
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) throw new Error('Sign in is required to message a patient.');
+  const { data, error } = await supabase.from('care_team_messages')
+    .insert({ patient_id: patientId, sender_id: userData.user.id, body: trimmedBody })
+    .select('id, patient_id, sender_id, body, created_at')
+    .single();
+  if (error) throw error;
+  return data as StaffChatMessage;
+}
+
 export async function getReportUrl(filePath: string): Promise<string> {
   if (STAFF_DEMO_MODE) return filePath;
   const { data, error } = await supabase.storage.from('careloop-reports').createSignedUrl(filePath, 3600);
@@ -427,11 +534,25 @@ export async function addPatientToGroup(groupId: string, patientId: string): Pro
 
 export async function createConnectionInvitation(patientId: string): Promise<{ code: string; expires_at: string }> {
   if (STAFF_DEMO_MODE) return { code: 'CL-DEMO24', expires_at: new Date(Date.now() + 86400000).toISOString() };
-  const { data: userData } = await supabase.auth.getUser();
-  const code = `CL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-  const { data, error } = await supabase.from('connection_invitations').insert({ patient_id: patientId, code, created_by: userData.user?.id }).select('code, expires_at').single();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) throw new Error('Sign in is required to create a patient connection.');
+  const { data: membership, error: membershipError } = await supabase.from('care_team_memberships')
+    .select('care_team_id')
+    .eq('profile_id', userData.user.id)
+    .eq('active', true)
+    .limit(1)
+    .maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!membership?.care_team_id) throw new Error('Your account is not assigned to an active care team.');
+  const { data, error } = await supabase.rpc('create_connection_invitation', {
+    target_patient_id: patientId,
+    target_care_team_id: membership.care_team_id,
+    invitation_ttl_hours: 24,
+  });
   if (error) throw error;
-  return data as { code: string; expires_at: string };
+  const invitation = Array.isArray(data) ? data[0] : data;
+  if (!invitation?.code || !invitation.expires_at) throw new Error('The invitation service returned an incomplete connection code.');
+  return invitation as { code: string; expires_at: string };
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
@@ -457,6 +578,20 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     pendingTests: testRows.filter((row) => row.status === 'pending' || row.status === 'overdue').length,
     recentUpdates: activity.count ?? 0,
   };
+}
+
+export async function listFollowUpQueue(options: { status?: FollowUpQueueItem['status']; ownerId?: string; dueBefore?: string; limit?: number } = {}): Promise<FollowUpQueueItem[]> {
+  if (STAFF_DEMO_MODE) {
+    return DEMO_FOLLOW_UP_QUEUE.filter((item) => !options.status || item.status === options.status).slice(0, options.limit ?? 100);
+  }
+  const { data, error } = await supabase.rpc('list_follow_up_queue', {
+    target_status: options.status ?? null,
+    target_owner_id: options.ownerId ?? null,
+    due_before: options.dueBefore ?? null,
+    result_limit: options.limit ?? 100,
+  });
+  if (error) throw error;
+  return (data ?? []) as FollowUpQueueItem[];
 }
 
 export async function logActivity(patientId: string | null, action: string, entityType: string, entityId: string | null, summary: string): Promise<void> {

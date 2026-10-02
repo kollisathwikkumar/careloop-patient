@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Field, Notice, PrimaryButton, Section, SelectField, StaffShell, STAFF_COLORS } from '@/components/staff-ui';
 import { createPatient, listPatients, listProfiles, type Patient, type StaffProfile } from '@/lib/staff';
@@ -129,32 +130,36 @@ export default function StaffPatientsScreen() {
             <Text style={styles.formTitle}>Add a patient record</Text>
             <Text style={styles.formCopy}>Create the record first, then assign the care team responsible for follow-up.</Text>
             <View style={styles.row}>
-              <Field label="First name *" onChangeText={setFirstName} placeholder="Asha" value={firstName} />
-              <Field label="Last name *" onChangeText={setLastName} placeholder="Sharma" value={lastName} />
+              <Field inline label="First name *" onChangeText={setFirstName} placeholder="Asha" value={firstName} />
+              <Field inline label="Last name *" onChangeText={setLastName} placeholder="Sharma" value={lastName} />
             </View>
             <View style={styles.row}>
-              <Field label="Date of birth" onChangeText={setDateOfBirth} placeholder="1990-04-12" value={dateOfBirth} />
-              <Field keyboardType="phone-pad" label="Phone" onChangeText={setPhone} placeholder="+91 98765 43210" value={phone} />
+              <Field inline label="Date of birth" onChangeText={setDateOfBirth} placeholder="1990-04-12" value={dateOfBirth} />
+              <Field inline keyboardType="phone-pad" label="Phone" onChangeText={setPhone} placeholder="+91 98765 43210" value={phone} />
             </View>
             <View style={styles.row}>
-              <Field keyboardType="email-address" label="Email" onChangeText={setEmail} placeholder="patient@example.com" value={email} />
-              <Field label="Condition / care area" onChangeText={setCondition} placeholder="Follow-up care" value={condition} />
+              <Field inline keyboardType="email-address" label="Email" onChangeText={setEmail} placeholder="patient@example.com" value={email} />
+              <Field inline label="Condition / care area" onChangeText={setCondition} placeholder="Follow-up care" value={condition} />
             </View>
             <View style={styles.row}>
-              <SelectField label="Assign doctor" onChange={setDoctor} optionLabels={Object.fromEntries(doctors.map((profile) => [profile.id, profile.full_name]))} options={['', ...doctors.map((profile) => profile.id)]} value={doctor} />
-              <SelectField label="Assign staff member" onChange={setStaff} optionLabels={Object.fromEntries(team.map((profile) => [profile.id, profile.full_name]))} options={['', ...team.map((profile) => profile.id)]} value={staff} />
+              <SelectField inline label="Assign doctor" onChange={setDoctor} optionLabels={Object.fromEntries(doctors.map((profile) => [profile.id, profile.full_name]))} options={['', ...doctors.map((profile) => profile.id)]} value={doctor} />
+              <SelectField inline label="Assign staff member" onChange={setStaff} optionLabels={Object.fromEntries(team.map((profile) => [profile.id, profile.full_name]))} options={['', ...team.map((profile) => profile.id)]} value={staff} />
             </View>
             <PrimaryButton disabled={saving} label={saving ? 'Saving…' : 'Create patient'} onPress={() => void submit()} />
           </View>
         ) : null}
 
-        <View style={styles.listHeader}>
-          <Text style={styles.listHeading}>Patient</Text>
-          <Text style={styles.listHeading}>Care area</Text>
-          <Text style={styles.listHeading}>Care team</Text>
-          <Text style={styles.listHeading}>Status</Text>
-        </View>
-        {loading ? <ActivityIndicator color={STAFF_COLORS.blue} style={styles.loader} /> : visiblePatients.length === 0 ? <Text style={styles.empty}>No matching patients.</Text> : visiblePatients.map((patient) => <PatientRow key={patient.id} patient={patient} onPress={() => router.push({ pathname: '/staff/patients/[id]', params: { id: patient.id } })} />)}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tableScroll}>
+          <View style={styles.tableInner}>
+            <View style={styles.listHeader}>
+              <Text style={styles.listHeading}>Patient</Text>
+              <Text style={styles.listHeading}>Care area</Text>
+              <Text style={styles.listHeading}>Care team</Text>
+              <Text style={styles.listHeading}>Status</Text>
+            </View>
+            {loading ? <ActivityIndicator color={STAFF_COLORS.blue} style={styles.loader} /> : visiblePatients.length === 0 ? <Text style={styles.empty}>No matching patients.</Text> : visiblePatients.map((patient) => <PatientRow key={patient.id} patient={patient} onPress={() => router.push({ pathname: '/staff/patients/[id]', params: { id: patient.id } })} />)}
+          </View>
+        </ScrollView>
       </Section>
     </StaffShell>
   );
@@ -171,13 +176,13 @@ function PatientRow({ patient, onPress }: { patient: Patient; onPress: () => voi
       <Text style={styles.tableText}>{patient.condition || 'General care'}</Text>
       <Text style={styles.tableText}>Assigned team</Text>
       <View style={styles.statusPill}><Text style={styles.statusText}>Active</Text></View>
-      <Text style={styles.chevron}>›</Text>
+      <Ionicons name="chevron-forward" size={18} color={STAFF_COLORS.muted} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  heroRow: { alignItems: 'center', backgroundColor: '#E9F5FF', borderColor: '#D5ECFF', borderRadius: 18, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18, paddingHorizontal: 22, paddingVertical: 18 },
+  heroRow: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: STAFF_COLORS.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 18, paddingHorizontal: 22, paddingVertical: 18 },
   eyebrow: { color: STAFF_COLORS.blue, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   heroTitle: { color: STAFF_COLORS.navy, fontSize: 23, fontWeight: '800', marginTop: 5 },
   heroCopy: { color: STAFF_COLORS.muted, fontSize: 13, marginTop: 5 },
@@ -195,6 +200,8 @@ const styles = StyleSheet.create({
   formTitle: { color: STAFF_COLORS.navy, fontSize: 16, fontWeight: '800' },
   formCopy: { color: STAFF_COLORS.muted, fontSize: 13, marginBottom: 14, marginTop: 4 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  tableScroll: { flexGrow: 1 },
+  tableInner: { minWidth: 710, width: '100%' },
   listHeader: { borderBottomColor: '#E8EEF5', borderBottomWidth: 1, flexDirection: 'row', gap: 16, paddingBottom: 9, paddingHorizontal: 4 },
   listHeading: { color: '#91A0B3', flex: 1, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
   patientRow: { alignItems: 'center', borderBottomColor: '#EDF2F7', borderBottomWidth: 1, flexDirection: 'row', gap: 16, minHeight: 70, paddingHorizontal: 4 },

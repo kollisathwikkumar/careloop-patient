@@ -1,6 +1,6 @@
-import { getPatientAppPatient as getDemoPatient, patchPatientAppPatient as patchDemoPatient } from '@/lib/patient-backend';
+import { getActivePatientId, getPatientAppPatient, patchPatientAppPatient } from '@/lib/patient-backend';
 
-export type AppointmentStatus = 'confirmed' | 'reschedule-requested' | 'awaiting-confirmation';
+export type AppointmentStatus = 'confirmed' | 'reschedule-requested' | 'awaiting-confirmation' | 'not-scheduled';
 
 export type AppointmentSchedule = Readonly<{
   date: string;
@@ -10,49 +10,46 @@ export type AppointmentSchedule = Readonly<{
 }>;
 
 export const DEFAULT_APPOINTMENT: AppointmentSchedule = {
-  date: '24 September 2026',
-  weekday: 'Thursday',
-  time: '10:30 AM',
-  status: 'confirmed',
+  date: 'Not scheduled',
+  weekday: 'To be confirmed',
+  time: 'To be confirmed',
+  status: 'not-scheduled',
 };
 
-export const RESCHEDULE_DATES: readonly Pick<AppointmentSchedule, 'date' | 'weekday'>[] = [
-  { date: '28 September 2026', weekday: 'Monday' },
-  { date: '30 September 2026', weekday: 'Wednesday' },
-  { date: '12 October 2026', weekday: 'Monday' },
-];
+export function getRescheduleDates(): readonly Pick<AppointmentSchedule, 'date' | 'weekday'>[] {
+  const today = new Date();
+  return [7, 14, 21].map((daysAhead) => {
+    const candidate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + daysAhead);
+    return {
+      date: candidate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+      weekday: candidate.toLocaleDateString('en-US', { weekday: 'long' }),
+    };
+  });
+}
 
 export const RESCHEDULE_TIMES: readonly string[] = ['10:30 AM', '2:00 PM', '4:30 PM'];
-
-let cachedAppointment: AppointmentSchedule = DEFAULT_APPOINTMENT;
 
 export function isAppointmentChanged(appointment: AppointmentSchedule): boolean {
   return appointment.date !== DEFAULT_APPOINTMENT.date || appointment.time !== DEFAULT_APPOINTMENT.time;
 }
 
-export async function loadAppointment(patientId = 'CL-1042'): Promise<AppointmentSchedule> {
-  try {
-    const patient = await getDemoPatient(patientId);
-    cachedAppointment = {
-      date: patient.nextFollowup,
-      weekday: patient.weekday,
-      time: patient.time,
-      status: patient.response === 'Confirmed' ? 'confirmed' : patient.response === 'Reschedule requested' ? 'reschedule-requested' : 'awaiting-confirmation',
-    };
-  } catch {
-    // The patient demo can still open when the local demo API is starting.
-  }
-
-  return cachedAppointment;
+export async function loadAppointment(patientId?: string): Promise<AppointmentSchedule> {
+  const linkedPatientId = patientId ?? await getActivePatientId();
+  const patient = await getPatientAppPatient(linkedPatientId);
+  return {
+    date: patient.nextFollowup,
+    weekday: patient.weekday,
+    time: patient.time,
+    status: patient.status === 'upcoming' && patient.response === 'Confirmed' ? 'confirmed' : patient.status === 'not-scheduled' ? 'not-scheduled' : patient.response === 'Reschedule requested' ? 'reschedule-requested' : 'awaiting-confirmation',
+  };
 }
 
-export async function saveAppointment(appointment: AppointmentSchedule, patientId = 'CL-1042'): Promise<void> {
-  const patient = await patchDemoPatient({
+export async function saveAppointment(appointment: AppointmentSchedule, patientId: string): Promise<void> {
+  await patchPatientAppPatient({
     nextFollowup: appointment.date,
     weekday: appointment.weekday,
     time: appointment.time,
     response: appointment.status === 'confirmed' ? 'Confirmed' : 'Reschedule requested',
     status: appointment.status === 'confirmed' ? 'Confirmed' : 'Reschedule Requested',
   }, patientId);
-  cachedAppointment = { date: patient.nextFollowup, weekday: patient.weekday, time: patient.time, status: appointment.status };
 }

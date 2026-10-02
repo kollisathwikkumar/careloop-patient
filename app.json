@@ -8,7 +8,10 @@
     "scheme": "carelooppatient",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSCameraUsageDescription": "CareLoop uses your camera to scan a care-team connection QR code."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +28,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow CareLoop to scan a care-team connection QR code."
+        }
+      ],
       [
         "expo-splash-screen",
         {

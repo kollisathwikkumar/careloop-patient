@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Field, Notice, PrimaryButton, Section, SelectField, StaffShell, STAFF_COLORS } from '@/components/staff-ui';
+import { DateTimeField, Field, Notice, PrimaryButton, Section, SelectField, StaffShell, STAFF_COLORS } from '@/components/staff-ui';
 import { createReport, createTest, getReportUrl, listPatients, listReports, listTests, uploadReportFile, type Patient, type Report, type Test } from '@/lib/staff';
 
 type TestRow = Test & { patientName: string };
@@ -66,8 +66,8 @@ export default function StaffTestsScreen() {
       <View style={styles.summary}><View><Text style={styles.eyebrow}>INVESTIGATIONS</Text><Text style={styles.heroTitle}>Tests and reports</Text><Text style={styles.heroCopy}>Track every investigation from request to uploaded result.</Text></View><View style={styles.metric}><Text style={styles.metricValue}>{pendingCount}</Text><Text style={styles.metricLabel}>need attention</Text></View></View>
 
       <Section title="Add investigation">
-        <View style={styles.row}><SelectField label="Patient *" onChange={setPatientId} optionLabels={patientLabels} options={['', ...patients.map((patient) => patient.id)]} value={patientId} /><Field label="Exact test name *" onChangeText={setTestName} placeholder="HbA1c" value={testName} /></View>
-        <View style={styles.row}><Field label="Test date *" onChangeText={setTestDate} placeholder="2026-09-25" value={testDate} /><SelectField label="Status" onChange={(value) => setTestStatus(value as Test['status'])} options={['pending', 'completed', 'overdue']} value={testStatus} /></View>
+        <View style={styles.row}><SelectField inline label="Patient *" onChange={setPatientId} optionLabels={patientLabels} options={['', ...patients.map((patient) => patient.id)]} value={patientId} /><Field inline label="Exact test name *" onChangeText={setTestName} placeholder="HbA1c" value={testName} /></View>
+        <View style={styles.row}><DateTimeField inline kind="date" label="Test date *" onChangeText={setTestDate} placeholder="Choose test date" value={testDate} /><SelectField inline label="Status" onChange={(value) => setTestStatus(value as Test['status'])} options={['pending', 'completed', 'overdue']} value={testStatus} /></View>
         <Field label="Notes" multiline onChangeText={setTestNotes} placeholder="Clinical notes or preparation instructions" value={testNotes} />
         <PrimaryButton disabled={busy} label="Add test" onPress={() => void run(async () => { if (!patientId || !testName.trim() || !testDate.trim()) throw new Error('Patient, exact test name, and test date are required.'); await createTest({ patient_id: patientId, name: testName.trim(), test_date: testDate.trim(), status: testStatus, notes: testNotes.trim() || null }); setTestName(''); setTestDate(''); setTestNotes(''); }, 'Test added.')} />
       </Section>
@@ -79,7 +79,7 @@ export default function StaffTestsScreen() {
       <Section title="Upload a report">
         <Text style={styles.helper}>Attach each result to the exact test so the patient record and app show the right report history.</Text>
         <SelectField label="Attach report to test *" onChange={setReportTest} optionLabels={Object.fromEntries(tests.map((test) => [test.id, `${test.patientName} · ${test.name}`]))} options={['', ...tests.map((test) => test.id)]} value={reportTest} />
-        <View style={styles.row}><Field label="Report file name" onChangeText={setReportName} placeholder="hba1c-report.pdf" value={reportName} /><Field label="Report URL or storage path" onChangeText={setReportPath} placeholder="https://… or careloop-reports/…" value={reportPath} /></View>
+        <View style={styles.row}><Field inline label="Report file name" onChangeText={setReportName} placeholder="hba1c-report.pdf" value={reportName} /><Field inline label="Report URL or storage path" onChangeText={setReportPath} placeholder="https://… or careloop-reports/…" value={reportPath} /></View>
         <View style={styles.actions}><PrimaryButton label={reportFile ? `Selected: ${reportFile.name}` : 'Choose report file'} onPress={pickFile} secondary /><PrimaryButton disabled={busy} label="Save report" onPress={() => void run(async () => { if (!reportTest || !selectedTest) throw new Error('Select a test first.'); if (reportFile) await uploadReportFile(selectedTest.patient_id, reportTest, reportFile); else { if (!reportName.trim() || !reportPath.trim()) throw new Error('Choose a file or provide report file details.'); await createReport({ patient_id: selectedTest.patient_id, test_id: reportTest, file_path: reportPath.trim(), file_name: reportName.trim(), mime_type: null }); } setReportName(''); setReportPath(''); setReportFile(null); }, 'Report saved.')} /></View>
         {reports.length === 0 ? <Text style={styles.empty}>No reports uploaded yet.</Text> : reports.map((report) => <ReportItem key={report.id} report={report} />)}
       </Section>
@@ -91,7 +91,7 @@ function StatusPill({ status }: { status: string }) { return <View style={[style
 function ReportItem({ report }: { report: ReportRowData }) { const [opening, setOpening] = useState(false); const open = async () => { setOpening(true); try { const url = report.file_path.startsWith('http') ? report.file_path : await getReportUrl(report.file_path); if (url.startsWith('http')) await Linking.openURL(url); } finally { setOpening(false); } }; return <Pressable onPress={() => void open()} style={styles.dataRow}><Text style={styles.dataTitle}>{report.file_name}</Text><Text style={styles.dataDetail}>{report.patientName} · {opening ? 'Opening…' : 'Open report'}</Text></Pressable>; }
 
 const styles = StyleSheet.create({
-  summary: { alignItems: 'center', backgroundColor: '#E9F5FF', borderColor: '#D5ECFF', borderRadius: 18, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18, padding: 22 },
+  summary: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: STAFF_COLORS.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 18, padding: 22 },
   eyebrow: { color: STAFF_COLORS.blue, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   heroTitle: { color: STAFF_COLORS.navy, fontSize: 23, fontWeight: '800', marginTop: 5 },
   heroCopy: { color: STAFF_COLORS.muted, fontSize: 13, marginTop: 5 },

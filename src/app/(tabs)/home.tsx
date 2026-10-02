@@ -1,15 +1,15 @@
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState, type JSX } from 'react';
-import { Alert, AppState, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   DEFAULT_APPOINTMENT,
-  RESCHEDULE_DATES,
+  getRescheduleDates,
   RESCHEDULE_TIMES,
   saveAppointment,
   type AppointmentSchedule,
 } from '@/lib/appointment';
 import { CareLoopCard, CareLoopColors as C, CareLoopIcon, CareLoopLogo, PatientAppFrame } from '@/components/careloop-ui';
-import { getActivePatientId as getActiveDemoPatientId, getPatientAppPatient as getDemoPatient, type PatientAppPatient as DemoPatient } from '@/lib/patient-backend';
+import { getActivePatientId, getPatientAppPatient, type PatientAppPatient } from '@/lib/patient-backend';
 
 function shortDate(date: string): string {
   return date.replace('September', 'Sep').replace('October', 'Oct');
@@ -23,12 +23,13 @@ type RescheduleModalProps = {
 };
 
 function RescheduleModal({ initialAppointment, onCancel, onSubmit, visible }: RescheduleModalProps): JSX.Element {
+  const rescheduleDates = getRescheduleDates();
   const [selectedDate, setSelectedDate] = useState(initialAppointment.date);
   const [selectedTime, setSelectedTime] = useState(initialAppointment.time);
   const [isSaving, setIsSaving] = useState(false);
 
   const submitRequest = async (): Promise<void> => {
-    const selectedDateOption = RESCHEDULE_DATES.find((option) => option.date === selectedDate);
+    const selectedDateOption = rescheduleDates.find((option) => option.date === selectedDate);
     const appointment: AppointmentSchedule = {
       date: selectedDate,
       weekday: selectedDateOption?.weekday ?? initialAppointment.weekday,
@@ -63,7 +64,7 @@ function RescheduleModal({ initialAppointment, onCancel, onSubmit, visible }: Re
 
           <Text style={styles.fieldLabel}>Select a date</Text>
           <View style={styles.choiceRow}>
-            {RESCHEDULE_DATES.map((option) => {
+            {rescheduleDates.map((option) => {
               const selected = option.date === selectedDate;
               return (
                 <Pressable
@@ -125,20 +126,13 @@ function Header({ onMessages }: { onMessages: () => void }): JSX.Element {
       <CareLoopLogo />
       <Pressable accessibilityLabel="Open messages" accessibilityRole="button" onPress={onMessages} style={styles.notificationButton}>
         <CareLoopIcon name="message" size={23} color={C.navy} />
-        <View style={styles.notificationDot} />
       </Pressable>
     </View>
   );
 }
 
 function DoctorAvatar({ size = 42 }: { size?: number }): JSX.Element {
-  return (
-    <Image
-      accessibilityLabel="Dr. K. Sathwik"
-      source={require('@/assets/images/careloop/doctor-avatar.png')}
-      style={[styles.doctorAvatar, { height: size, width: size }]}
-    />
-  );
+  return <View accessibilityLabel="Care team" style={[styles.doctorAvatar, { height: size, width: size }]}><CareLoopIcon color={C.blue} name="doctor" size={Math.round(size * 0.48)} /></View>;
 }
 
 function DetailLine({ icon, title, detail }: { icon: 'calendar' | 'clock'; title: string; detail: string }): JSX.Element {
@@ -155,49 +149,37 @@ function DetailLine({ icon, title, detail }: { icon: 'calendar' | 'clock'; title
   );
 }
 
-function ProgressNode({ label, date, state }: { label: string; date: string; state: 'complete' | 'current' | 'future' }): JSX.Element {
-  return (
-    <View style={styles.progressNode}>
-      <View style={[styles.progressDot, state === 'complete' && styles.progressDotComplete, state === 'current' && styles.progressDotCurrent]}>
-        {state === 'complete' ? <CareLoopIcon color="#FFFFFF" name="check" size={14} /> : null}
-        {state === 'current' ? <CareLoopIcon color="#FFFFFF" name="heart" size={13} /> : null}
-      </View>
-      <Text style={[styles.progressLabel, state === 'current' && styles.progressLabelCurrent]}>{label}</Text>
-      <Text style={styles.progressDate}>{date}</Text>
-    </View>
-  );
-}
-
 export default function HomeScreen(): JSX.Element {
   const router = useRouter();
   const [appointment, setAppointment] = useState<AppointmentSchedule>(DEFAULT_APPOINTMENT);
-  const [sharedPatient, setSharedPatient] = useState<DemoPatient | null>(null);
-  const [activePatientId, setActivePatientId] = useState('CL-1042');
+  const [sharedPatient, setSharedPatient] = useState<PatientAppPatient | null>(null);
+  const [activePatientId, setActivePatientId] = useState('');
   const [backendConnected, setBackendConnected] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
+  const [isSavingConfirmation, setIsSavingConfirmation] = useState(false);
   const [isRescheduleVisible, setIsRescheduleVisible] = useState(false);
 
   useEffect(() => {
     let active = true;
-    const refreshFromDemoApi = async (): Promise<void> => {
+    const refreshFromCareRecord = async (): Promise<void> => {
       try {
-        const patientId = await getActiveDemoPatientId();
-        const patient = await getDemoPatient(patientId);
+        const patientId = await getActivePatientId();
+        const patient = await getPatientAppPatient(patientId);
         if (!active) return;
         setActivePatientId(patientId);
         setSharedPatient(patient);
         setBackendConnected(true);
-        setAppointment({ date: patient.nextFollowup, weekday: patient.weekday, time: patient.time, status: patient.response === 'Confirmed' ? 'confirmed' : patient.response === 'Reschedule requested' ? 'reschedule-requested' : 'awaiting-confirmation' });
+        setAppointment({ date: patient.nextFollowup, weekday: patient.weekday, time: patient.time, status: patient.status === 'not-scheduled' ? 'not-scheduled' : patient.response === 'Confirmed' ? 'confirmed' : patient.response === 'Reschedule requested' ? 'reschedule-requested' : 'awaiting-confirmation' });
       } catch {
-        if (active) setBackendConnected(false);
+        if (active) { setBackendConnected(false); setSharedPatient(null); setAppointment(DEFAULT_APPOINTMENT); }
       }
     };
-    void refreshFromDemoApi();
+    void refreshFromCareRecord();
     const refreshTimer = setInterval(() => {
-      if (AppState.currentState === 'active') void refreshFromDemoApi();
-    }, 1200);
+      if (AppState.currentState === 'active') void refreshFromCareRecord();
+    }, 30000);
     const appState = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') void refreshFromDemoApi();
+      if (nextState === 'active') void refreshFromCareRecord();
     });
     return () => {
       active = false;
@@ -213,16 +195,22 @@ export default function HomeScreen(): JSX.Element {
     Alert.alert('Request sent', 'Your care team will confirm the new appointment time.');
   };
 
-  const confirmAttendance = (): void => {
+  const confirmAttendance = async (): Promise<void> => {
+    if (isSavingConfirmation || !backendConnected || !activePatientId) return;
     const confirmedAppointment: AppointmentSchedule = { ...appointment, status: 'confirmed' };
     const message = `Appointment confirmed — ${confirmedAppointment.date} at ${confirmedAppointment.time}.`;
-    setAppointment(confirmedAppointment);
-    setConfirmationMessage(message);
-    void saveAppointment(confirmedAppointment, activePatientId).catch(() => {
-      setAppointment(appointment);
-      setConfirmationMessage(null);
-      Alert.alert('Confirmation not saved', 'Please try again when you have a connection.');
-    });
+    setIsSavingConfirmation(true);
+    try {
+      await saveAppointment(confirmedAppointment, activePatientId);
+      setAppointment(confirmedAppointment);
+      setSharedPatient((current) => current ? { ...current, response: 'Confirmed' } : current);
+      setConfirmationMessage(message);
+    } catch (error) {
+      console.error('[CareLoop] Appointment confirmation save failed:', error);
+      Alert.alert('Confirmation not saved', 'Your care team has not received your confirmation. Check your connection and try again.');
+    } finally {
+      setIsSavingConfirmation(false);
+    }
   };
 
   return (
@@ -233,8 +221,8 @@ export default function HomeScreen(): JSX.Element {
         <View style={styles.greetingRow}>
           <View style={styles.greetingCopy}>
             <Text style={styles.greeting}>Good morning,</Text>
-            <Text style={styles.patientName}>{sharedPatient?.name.split(' ')[0] ?? 'Ramesh'}</Text>
-            <Text style={styles.greetingSubtitle}>{sharedPatient?.id ?? 'CL-1042'} · {backendConnected ? 'Connected demo' : 'Connecting to demo'}</Text>
+            <Text style={styles.patientName}>{sharedPatient?.name.split(' ')[0] ?? 'Patient'}</Text>
+            <Text style={styles.greetingSubtitle}>{backendConnected ? 'Connected to your care team' : 'Connect your care team to see your record'}</Text>
           </View>
           <View style={styles.greetingBubble}>
             <DoctorAvatar size={58} />
@@ -253,7 +241,7 @@ export default function HomeScreen(): JSX.Element {
           </View>
         ) : null}
 
-        {appointment.status === 'confirmed' && sharedPatient?.response === 'Confirmed' ? null : <CareLoopCard style={styles.nextStepCard}>
+        {appointment.status !== 'not-scheduled' && !(appointment.status === 'confirmed' && sharedPatient?.response === 'Confirmed') ? <CareLoopCard style={styles.nextStepCard}>
           <View style={styles.nextStepHeader}>
             <View>
               <Text style={styles.eyebrow}>YOUR NEXT STEP</Text>
@@ -273,55 +261,47 @@ export default function HomeScreen(): JSX.Element {
           <View style={styles.doctorLine}>
             <DoctorAvatar />
             <View style={styles.detailCopy}>
-              <Text style={styles.doctorName}>{sharedPatient?.doctor ?? 'Dr. K. Sathwik'}</Text>
-              <Text style={styles.detailText}>{sharedPatient?.department ?? 'General Medicine'}</Text>
+              <Text style={styles.doctorName}>{sharedPatient?.doctor ?? 'Your care team'}</Text>
+              <Text style={styles.detailText}>{sharedPatient?.department ?? 'Care coordination'}</Text>
             </View>
-            <View style={styles.connectedBadge}>
+            {backendConnected ? <View style={styles.connectedBadge}>
               <View style={styles.connectedDot} />
               <Text style={styles.connectedText}>Connected</Text>
-            </View>
+            </View> : null}
           </View>
 
           <View style={styles.sharedAction}>
             <CareLoopIcon name="heart" size={18} />
             <View style={styles.detailCopy}>
-              <Text style={styles.sharedActionEyebrow}>CARE TEAM UPDATE · {backendConnected ? 'LIVE' : 'CONNECTING'}</Text>
+              <Text style={styles.sharedActionEyebrow}>CARE TEAM UPDATE</Text>
               <Text style={styles.sharedActionText}>{sharedPatient?.nextAction ?? 'Your care team’s next step will appear here.'}</Text>
             </View>
           </View>
 
-          <Pressable accessibilityLabel="Confirm attendance for follow-up appointment" accessibilityRole="button" onPress={confirmAttendance} style={styles.primaryAction}>
+          <Pressable accessibilityLabel="Confirm attendance for follow-up appointment" accessibilityRole="button" disabled={isSavingConfirmation || !backendConnected || !activePatientId} onPress={() => void confirmAttendance()} style={[styles.primaryAction, (isSavingConfirmation || !backendConnected || !activePatientId) && styles.disabledAction]}>
             <CareLoopIcon color="#FFFFFF" name="calendar" size={19} />
-            <Text style={styles.primaryActionText}>I’ll attend</Text>
+            <Text style={styles.primaryActionText}>{isSavingConfirmation ? 'Saving…' : 'I’ll attend'}</Text>
             <CareLoopIcon color="#FFFFFF" name="chevron" size={18} />
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => setIsRescheduleVisible(true)} style={styles.secondaryAction}>
             <CareLoopIcon name="calendar" size={19} />
             <Text style={styles.secondaryActionText}>Request reschedule</Text>
           </Pressable>
-        </CareLoopCard>}
+        </CareLoopCard> : null}
 
         <Pressable accessibilityRole="button" onPress={() => router.replace('/journey')}>
           <CareLoopCard style={styles.journeyCard}>
             <View style={styles.sectionHeadingRow}>
               <View>
-                <Text style={styles.cardTitle}>Your care journey continues</Text>
-                <Text style={styles.cardSubtitle}>One follow-up at a time.</Text>
+                <Text style={styles.cardTitle}>Your appointments</Text>
+                <Text style={styles.cardSubtitle}>View appointments recorded by your care team.</Text>
               </View>
               <CareLoopIcon name="chevron" size={19} color={C.secondary} />
-            </View>
-            <View style={styles.progressNodes}>
-              <View pointerEvents="none" style={styles.progressTrack}>
-                <View style={styles.progressTrackComplete} />
-              </View>
-              <ProgressNode label="Previous" date="Consultation · 21 Sep" state="complete" />
-              <ProgressNode label="Next" date={shortDate(appointment.date)} state="current" />
-              <ProgressNode label="Later" date="Review · 12 Oct" state="future" />
             </View>
           </CareLoopCard>
         </Pressable>
 
-        <Pressable accessibilityRole="button" onPress={() => router.push('/doctor')}>
+        {sharedPatient?.doctor && sharedPatient.doctor !== 'Care team' ? <Pressable accessibilityRole="button" onPress={() => router.push('/doctor')}>
           <CareLoopCard style={styles.doctorCard}>
             <View style={styles.detailIcon}>
               <CareLoopIcon name="heart" size={21} />
@@ -329,17 +309,17 @@ export default function HomeScreen(): JSX.Element {
             <DoctorAvatar size={44} />
             <View style={styles.doctorCardCopy}>
               <Text style={styles.sectionEyebrow}>YOUR DOCTOR</Text>
-              <Text style={styles.doctorCardName}>Dr. K. Sathwik</Text>
-              <Text style={styles.detailText}>General Medicine</Text>
+              <Text style={styles.doctorCardName}>{sharedPatient.doctor}</Text>
+              <Text style={styles.detailText}>{sharedPatient.department}</Text>
             </View>
-            <View style={styles.doctorConnected}>
+            {backendConnected ? <View style={styles.doctorConnected}>
               <View style={styles.connectedDot} />
               <Text style={styles.connectedText}>Connected</Text>
-            </View>
+            </View> : null}
           </CareLoopCard>
-        </Pressable>
+        </Pressable> : null}
 
-        <Pressable accessibilityRole="button" onPress={() => router.replace('/alerts')}>
+        {appointment.status !== 'not-scheduled' ? <Pressable accessibilityRole="button" onPress={() => router.replace('/alerts')}>
           <CareLoopCard style={styles.reminderCard}>
             <View style={styles.reminderIcon}>
               <CareLoopIcon name="reminder" size={22} />
@@ -350,7 +330,7 @@ export default function HomeScreen(): JSX.Element {
             </View>
             <CareLoopIcon name="chevron" size={18} color={C.secondary} />
           </CareLoopCard>
-        </Pressable>
+        </Pressable> : null}
       </ScrollView>
 
       <RescheduleModal
@@ -400,6 +380,7 @@ const styles = StyleSheet.create({
   connectedDot: { backgroundColor: C.green, borderRadius: 5, height: 8, width: 8 },
   connectedText: { color: C.green, fontSize: 10, fontWeight: '700' },
   primaryAction: { alignItems: 'center', backgroundColor: C.blue, borderRadius: 14, flexDirection: 'row', gap: 9, justifyContent: 'center', marginTop: 10, minHeight: 44, paddingHorizontal: 12 },
+  disabledAction: { opacity: 0.55 },
   primaryActionText: { color: C.surface, flex: 1, fontSize: 15, fontWeight: '800', textAlign: 'center' },
   secondaryAction: { alignItems: 'center', backgroundColor: C.surface, borderColor: '#8FC8F6', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 7, minHeight: 41 },
   secondaryActionText: { color: C.blue, fontSize: 14, fontWeight: '700' },

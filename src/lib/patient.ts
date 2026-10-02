@@ -19,6 +19,49 @@ export async function redeemPendingConnectionCode(code?: string): Promise<string
   return data as string;
 }
 
+export type PatientConnectivitySnapshot = {
+  patient_id: string;
+  organisation_id: string;
+  connection_id: string;
+  care_team_id: string;
+  connection_status: 'active' | 'withdrawn' | 'revoked';
+  consent_version: string;
+  consented_at: string;
+  connected_at: string;
+};
+
+export async function getPatientConnectivitySnapshot(): Promise<PatientConnectivitySnapshot | null> {
+  const { data, error } = await supabase.rpc('get_patient_connectivity_snapshot');
+  if (error) throw error;
+  const snapshot = (Array.isArray(data) ? data[0] : data) as PatientConnectivitySnapshot | null;
+  return snapshot?.connection_status === 'active' ? snapshot : null;
+}
+
+export async function redeemPatientConnection(input: { code?: string; qrPayload?: string }): Promise<PatientConnectivitySnapshot> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) throw new Error('Sign in before connecting your care team.');
+
+  let patientId: string | null = null;
+  if (input.qrPayload) {
+    const { data, error } = await supabase.rpc('redeem_connection_qr_payload', { qr_payload: input.qrPayload.trim() });
+    if (error) throw error;
+    patientId = data as string | null;
+  } else if (input.code) {
+    const { data, error } = await supabase.rpc('redeem_connection_code', { invitation_code: input.code.trim().toUpperCase() });
+    if (error) throw error;
+    patientId = data as string | null;
+  } else {
+    throw new Error('Scan a care-team QR code or enter its connection code.');
+  }
+
+  const snapshot = await getPatientConnectivitySnapshot();
+  if (!patientId || !snapshot || snapshot.patient_id !== patientId) {
+    throw new Error('The connection was not confirmed. Ask your care team for a current code.');
+  }
+  await AsyncStorage.removeItem(PENDING_CONNECTION_KEY);
+  return snapshot;
+}
+
 export async function loadLinkedAppointment(): Promise<AppointmentSchedule | null> {
   try {
     const { data: userData } = await supabase.auth.getUser();

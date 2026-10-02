@@ -2,15 +2,17 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useEffect, useState } from 'react';
 import { DEFAULT_APPOINTMENT, loadAppointment, type AppointmentSchedule } from '@/lib/appointment';
+import { getPatientAppPatient, type PatientAppPatient } from '@/lib/patient-backend';
 
 export default function AppointmentsScreen() {
   const router = useRouter();
   const [appointment, setAppointment] = useState<AppointmentSchedule>(DEFAULT_APPOINTMENT);
-  useEffect(() => { void loadAppointment().then(setAppointment); }, []);
+  const [patient, setPatient] = useState<PatientAppPatient | null>(null);
+  useEffect(() => { void loadAppointment().then(setAppointment); void getPatientAppPatient().then(setPatient).catch(() => setPatient(null)); }, []);
   return <ScrollView contentContainerStyle={styles.content}>
     <Pressable accessibilityRole="button" accessibilityLabel="Back to More" onPress={() => router.replace('/more')}><Text style={styles.back}>‹  More</Text></Pressable>
     <Text style={styles.title}>My Appointments</Text><Text style={styles.subtitle}>View and manage your upcoming care.</Text>
-    <View style={styles.card}><Text style={styles.eyebrow}>UPCOMING FOLLOW-UP</Text><Text style={styles.name}>Dr. K. Sathwik</Text><Text style={styles.date}>{appointment.date} · {appointment.time}</Text><Text style={styles.status}>{appointment.status === 'confirmed' ? 'Confirmed' : appointment.status === 'reschedule-requested' ? 'Reschedule requested' : 'Awaiting confirmation'}</Text></View>
+    <View style={styles.card}><Text style={styles.eyebrow}>APPOINTMENT</Text><Text style={styles.name}>{appointment.status === 'not-scheduled' ? 'No appointment scheduled' : appointment.date}</Text>{appointment.status !== 'not-scheduled' ? <><Text style={styles.date}>{appointment.weekday} · {appointment.time}</Text><Text style={styles.status}>{appointment.status === 'confirmed' ? 'Confirmed' : appointment.status === 'reschedule-requested' ? 'Reschedule requested' : 'Awaiting confirmation'}</Text></> : null}{patient?.doctor && patient.doctor !== 'Care team' ? <Text style={styles.date}>{patient.doctor}</Text> : null}</View>
     <Pressable accessibilityRole="button" accessibilityLabel="Open alerts" onPress={() => router.replace('/alerts')} style={styles.button}><Text style={styles.buttonText}>View appointment updates</Text></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Open home" onPress={() => router.replace('/home')} style={styles.secondary}><Text style={styles.secondaryText}>Back to home</Text></Pressable>
   </ScrollView>;

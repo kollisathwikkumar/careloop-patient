@@ -1,14 +1,25 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CareLoopCard, CareLoopColors as C, CareLoopIcon, PatientAppFrame } from '@/components/careloop-ui';
 import { getPatientReportUrl } from '@/lib/patient-backend';
-import { PATIENT_REPORTS } from '@/lib/patient-records';
+import type { PatientReport } from '@/lib/patient-records';
+import { loadLinkedPatientRecord } from '@/lib/patient';
 
 export default function ReportDetailScreen(): JSX.Element {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const report = PATIENT_REPORTS.find((item) => item.id === id);
+  const [report, setReport] = useState<(PatientReport & { filePath: string }) | null>(null);
+  useEffect(() => {
+    let active = true;
+    void loadLinkedPatientRecord().then((record) => {
+      const row = record?.reports.find((item) => item.id === id);
+      if (!active || !row) return;
+      const test = record?.tests.find((item) => item.id === row.test_id);
+      setReport({ id: row.id, title: row.file_name, category: test ? 'Lab test' : 'Visit summary', date: new Date(row.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }), clinician: 'Care team', status: 'Available', preview: test?.name ?? 'Shared by your care team.', fileName: row.file_name, filePath: row.file_path });
+    }).catch(() => setReport(null));
+    return () => { active = false; };
+  }, [id]);
 
   return (
     <PatientAppFrame activeTab="reports" backgroundColor={C.surface}>
@@ -53,7 +64,7 @@ export default function ReportDetailScreen(): JSX.Element {
             </CareLoopCard>
 
             <Pressable accessibilityRole="button" onPress={() => {
-              void getPatientReportUrl(report.fileName).then((url) => {
+              void getPatientReportUrl(report.filePath).then((url) => {
                 if (!url) { Alert.alert('Report unavailable', 'The report is not available in your care-team records.'); return; }
                 return Linking.openURL(url);
               }).catch(() => Alert.alert('Report unavailable', 'The report is not available in your care-team records.'));
