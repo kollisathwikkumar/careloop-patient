@@ -1,22 +1,42 @@
 # CareLoop Patient
 
-CareLoop Patient is the Expo / React Native mobile app for patients to connect with their care team, review appointments and follow-ups, see reports and medications, and send secure messages. Patient records are loaded from the configured Supabase project; the app does not bundle sample patient accounts or seeded history.
+CareLoop Patient is the Expo / React Native app that lets a patient stay connected with their care team between visits. It is backed by the CareLoop Supabase project shared with the doctor workspace.
 
-## Run locally
+## Patient features
 
-Requirements: Node.js and npm.
+- **Home and care journey:** see recorded next steps and follow-up information.
+- **Appointments:** review visits and respond to supported appointment requests.
+- **Messages:** exchange messages with the connected care team and share supported files.
+- **Reports and medications:** view records made available to the linked patient account.
+- **Care-team connection:** connect using a CareLoop invitation/QR flow.
 
-1. Copy `.env.example` to `.env` and set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for the same CareLoop Supabase project used by the doctor app.
-2. Install dependencies with `npm ci`.
-3. Start with `npm start`, then scan the Expo Go QR code. Use `npm run android` or `npm run ios` for a simulator.
+The app does not bundle sample patients, fake report history, or demo backend data. It needs a configured Supabase project and an authenticated patient account linked to a patient record. If no connection or records exist, the app should show its empty/unlinked state rather than substitute example data.
 
-The app requires a valid Supabase configuration and an authenticated, linked patient account to display live records. It does not fall back to demo data when the backend is unavailable.
+## Run with Expo Go
+
+Requirements: Node.js and npm. Install Expo Go on the phone, and keep the phone and development computer on a network that can reach the Expo development server.
+
+1. Copy `.env.example` to `.env`.
+2. Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the same CareLoop Supabase project used by the doctor workspace.
+3. Install dependencies: `npm ci`.
+4. Start Expo: `npm start`.
+5. Scan the QR code shown by Expo Go. If the phone cannot reach the computer over the local network, use Expo's tunnel connection option.
+
+For a connected Android device, use `npm run android`; for iOS use `npm run ios`. The `npm run simulator` helper starts the iOS simulator workflow. `npm run build` exports the web version and requires the public Supabase variables at build time.
 
 ## Checks
 
-- `npm test` — patient-flow and no-sample-data contract tests.
-- `npm run typecheck` — TypeScript check.
-- `npm run lint` — Expo lint.
-- `npm run build` — static web export. Set the Supabase public URL and publishable key in the environment for the build.
+```sh
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
 
-The app uses only the public publishable key. Never commit `.env` files, service-role keys, credentials, or real patient data. See the CareLoop-doctor repository's `backend/` directory for Supabase schema and backend workflow tests.
+The tests include patient-flow and no-sample-data checks. A successful build does not by itself verify a live Supabase login or prove that a production patient account is linked correctly.
+
+## Backend and notifications
+
+The shared Supabase schema, migrations, and backend workflow tests are maintained in the [CareLoop Doctor repository](https://github.com/kollisathwikkumar/CareLoop-doctor/tree/main/backend). The application uses the public Supabase publishable (or legacy anon) key; never include a service-role key in a mobile app.
+
+SMS delivery and phone OTP are not enabled until paid provider accounts and server-side secrets are configured. The app must not claim an SMS was sent when that provider setup is absent. Do not commit `.env` files, credentials, real patient records, or locally generated production data.
