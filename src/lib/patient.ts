@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { AppointmentSchedule } from '@/lib/appointment';
 import { supabase } from '@/lib/supabase';
-import type { Appointment, CarePlan, Medication, Patient, Report, Test } from '@/lib/staff';
+import type { Appointment, CarePlan, Medication, Patient, Report, Test } from '@/lib/patient-record-types';
 
 const PENDING_CONNECTION_KEY = '@careloop/pending-connection-code';
 

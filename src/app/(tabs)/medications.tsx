@@ -1,7 +1,7 @@
 import { useEffect, useState, type JSX } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CareLoopCard, CareLoopColors as C, CareLoopIcon, PatientAppFrame } from '@/components/careloop-ui';
-import type { Medication } from '@/lib/staff';
+import type { Medication } from '@/lib/patient-record-types';
 import { loadLinkedPatientRecord } from '@/lib/patient';
 
 function formatDate(value: string | null): string {

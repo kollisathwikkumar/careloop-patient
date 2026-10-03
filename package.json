@@ -50,7 +50,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "build": "expo export --platform web",
+    "test": "node --test scripts/alerts-navigation.test.mjs scripts/messages-unlinked-state.test.mjs scripts/no-patient-demo-data.test.mjs scripts/no-show-visibility.test.mjs scripts/patient-app-boundary.test.mjs scripts/patient-confirmation-fix.test.mjs scripts/reschedule-picker.test.mjs"
   },
   "private": true
 }

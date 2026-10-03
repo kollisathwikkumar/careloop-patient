@@ -110,8 +110,6 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   title: { color: C.navyDeep, fontSize: 24, fontWeight: '800', lineHeight: 31 },
   subtitle: { color: C.secondary, fontSize: 12, lineHeight: 18, marginTop: 1 },
-  demoNotice: { alignItems: 'center', backgroundColor: C.amberSurface, borderColor: '#F8E2BD', borderRadius: 15, borderWidth: 1, flexDirection: 'row', gap: 9, paddingHorizontal: 11, paddingVertical: 10 },
-  demoText: { color: '#845E2B', flex: 1, fontSize: 11, fontWeight: '600', lineHeight: 16 },
   reportHero: { alignItems: 'center', paddingHorizontal: 18, paddingVertical: 19 },
   largeIcon: { alignItems: 'center', backgroundColor: C.surfaceBlue, borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
   reportTitle: { color: C.navyDeep, fontSize: 17, fontWeight: '800', lineHeight: 23, marginTop: 10, textAlign: 'center' },

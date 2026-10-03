@@ -3,7 +3,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CareLoopCard, CareLoopColors as C, CareLoopIcon, PatientAppFrame } from '@/components/careloop-ui';
 import { loadLinkedPatientRecord } from '@/lib/patient';
-import type { Appointment } from '@/lib/staff';
+import type { Appointment } from '@/lib/patient-record-types';
 
 function AppointmentCard({ appointment }: { appointment: Appointment }): JSX.Element {
   const date = new Date(appointment.scheduled_at);
