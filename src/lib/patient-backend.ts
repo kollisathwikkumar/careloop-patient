@@ -90,7 +90,7 @@ export async function setActivePatientId(patientId: string): Promise<void> {
 async function loadPatient(patientId: string): Promise<PatientAppPatient> {
   const [patientResult, appointmentResult, planResult, followUpResult] = await Promise.all([
     supabase.from('patients').select('*').eq('id', patientId).single(),
-    supabase.from('appointments').select('id, patient_id, scheduled_at, status, purpose, notes').eq('patient_id', patientId).in('status', ['upcoming', 'overdue']).order('scheduled_at').limit(1),
+    supabase.from('appointments').select('id, patient_id, scheduled_at, status, purpose, notes').eq('patient_id', patientId).in('status', ['upcoming', 'overdue', 'missed']).order('scheduled_at'),
     supabase.from('care_plans').select('actions').eq('patient_id', patientId).eq('status', 'active').order('review_date').limit(1),
     supabase.from('follow_up_events').select('outcome, next_steps, attempted_at').eq('patient_id', patientId).order('attempted_at', { ascending: false }).limit(1),
   ]);
@@ -101,7 +101,7 @@ async function loadPatient(patientId: string): Promise<PatientAppPatient> {
 
   const patient = patientResult.data as PatientRow;
   const appointments = (appointmentResult.data ?? []) as AppointmentRow[];
-  const appointment = appointments[0] ?? null;
+  const appointment = appointments.find((item) => item.status === 'upcoming' || item.status === 'overdue') ?? appointments.find((item) => item.status === 'missed') ?? null;
   const activePlan = ((planResult.data ?? []) as CarePlanRow[])[0] ?? null;
   const latestFollowUp = ((followUpResult.data ?? []) as FollowUpRow[])[0] ?? null;
   const profileIds = [patient.assigned_doctor_id, patient.assigned_staff_id].filter((id): id is string => Boolean(id));
@@ -151,8 +151,9 @@ export async function patchPatientAppPatient(
   if (patientId && patientId !== activePatientId) throw new Error('Patient access is not permitted.');
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) throw new Error('Sign in is required to update your appointment.');
-  const { data: appointmentData, error: appointmentError } = await supabase.from('appointments').select('id, patient_id, scheduled_at, status, purpose, notes').eq('patient_id', activePatientId).in('status', ['upcoming', 'overdue']).order('scheduled_at').limit(1).maybeSingle();
+  const { data: appointmentRows, error: appointmentError } = await supabase.from('appointments').select('id, patient_id, scheduled_at, status, purpose, notes').eq('patient_id', activePatientId).in('status', ['upcoming', 'overdue', 'missed']).order('scheduled_at');
   if (appointmentError) throw appointmentError;
+  const appointmentData = ((appointmentRows ?? []) as AppointmentRow[]).find((item) => item.status === 'upcoming' || item.status === 'overdue') ?? ((appointmentRows ?? []) as AppointmentRow[]).find((item) => item.status === 'missed') ?? null;
 
   const nextScheduledAt = patch.response === 'Reschedule requested' && patch.nextFollowup && patch.time
     ? parseAppointmentDate(patch.nextFollowup, patch.time)

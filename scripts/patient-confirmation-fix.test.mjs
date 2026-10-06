@@ -27,7 +27,7 @@ test('localized patient appointment date and time serialize deterministically as
 
 test('confirmation targets the upcoming appointment and skips schedule parsing', async () => {
   const source = await read('../src/lib/patient-backend.ts');
-  assert.match(source, /\.in\('status',\s*\['upcoming',\s*'overdue'\]\)/);
+  assert.match(source, /\.in\('status',\s*\['upcoming',\s*'overdue',\s*'missed'\]\)/);
   assert.match(source, /patch\.response === 'Reschedule requested'[\s\S]{0,220}parseAppointmentDate/);
 });
 

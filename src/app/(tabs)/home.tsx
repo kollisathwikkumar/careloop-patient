@@ -3,6 +3,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { Alert, AppState, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   DEFAULT_APPOINTMENT,
+  getRescheduleCalendarMonths,
   getRescheduleDates,
   RESCHEDULE_TIMES,
   saveAppointment,
@@ -10,10 +11,6 @@ import {
 } from '@/lib/appointment';
 import { CareLoopCard, CareLoopColors as C, CareLoopIcon, CareLoopLogo, PatientAppFrame } from '@/components/careloop-ui';
 import { getActivePatientId, getPatientAppPatient, type PatientAppPatient } from '@/lib/patient-backend';
-
-function shortDate(date: string): string {
-  return date.replace('September', 'Sep').replace('October', 'Oct');
-}
 
 type RescheduleModalProps = {
   initialAppointment: AppointmentSchedule;
@@ -23,9 +20,13 @@ type RescheduleModalProps = {
 };
 
 function RescheduleModal({ initialAppointment, onCancel, onSubmit, visible }: RescheduleModalProps): JSX.Element {
+  const calendarMonths = getRescheduleCalendarMonths();
   const rescheduleDates = getRescheduleDates();
-  const [selectedDate, setSelectedDate] = useState(initialAppointment.date);
-  const [selectedTime, setSelectedTime] = useState(initialAppointment.time);
+  const firstAvailableDate = rescheduleDates[0];
+  const initialDate = rescheduleDates.some((option) => option.date === initialAppointment.date) ? initialAppointment.date : firstAvailableDate?.date ?? initialAppointment.date;
+  const initialTime = RESCHEDULE_TIMES.includes(initialAppointment.time) ? initialAppointment.time : RESCHEDULE_TIMES[0] ?? initialAppointment.time;
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [selectedTime, setSelectedTime] = useState(initialTime);
   const [isSaving, setIsSaving] = useState(false);
 
   const submitRequest = async (): Promise<void> => {
@@ -63,27 +64,20 @@ function RescheduleModal({ initialAppointment, onCancel, onSubmit, visible }: Re
           </View>
 
           <Text style={styles.fieldLabel}>Select a date</Text>
-          <View style={styles.choiceRow}>
-            {rescheduleDates.map((option) => {
-              const selected = option.date === selectedDate;
-              return (
-                <Pressable
-                  accessibilityLabel={`Select ${option.date}`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  key={option.date}
-                  onPress={() => setSelectedDate(option.date)}
-                  style={[styles.choice, selected && styles.choiceSelected]}
-                >
-                  <Text style={[styles.choiceDate, selected && styles.choiceTextSelected]}>{shortDate(option.date)}</Text>
-                  <Text style={[styles.choiceWeekday, selected && styles.choiceTextSelected]}>{option.weekday}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <ScrollView contentContainerStyle={styles.calendarContent} nestedScrollEnabled showsVerticalScrollIndicator style={styles.calendarScroll}>
+            {calendarMonths.map((month) => <View key={month.key} style={styles.calendarMonth}>
+              <Text style={styles.calendarMonthTitle}>{month.label}</Text>
+              <View style={styles.calendarWeekHeader}>{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((weekday) => <Text key={weekday} style={styles.calendarWeekday}>{weekday}</Text>)}</View>
+              <View style={styles.calendarGrid}>{month.cells.map((cell, index) => {
+                if (!cell) return <View key={`${month.key}-empty-${index}`} style={styles.calendarDay} />;
+                const selected = cell.date === selectedDate;
+                return <Pressable accessibilityLabel={`Select ${cell.date}`} accessibilityRole="button" accessibilityState={{ disabled: cell.disabled, selected }} disabled={cell.disabled} key={cell.date} onPress={() => setSelectedDate(cell.date)} style={[styles.calendarDay, cell.disabled && styles.calendarDayDisabled, selected && styles.calendarDaySelected]}><Text style={[styles.calendarDayText, cell.disabled && styles.calendarDayTextDisabled, selected && styles.calendarDayTextSelected]}>{cell.day}</Text></Pressable>;
+              })}</View>
+            </View>)}
+          </ScrollView>
 
           <Text style={styles.fieldLabel}>Select a time</Text>
-          <View style={styles.choiceRow}>
+          <ScrollView contentContainerStyle={styles.timeContent} nestedScrollEnabled showsVerticalScrollIndicator style={styles.timeScroll}>
             {RESCHEDULE_TIMES.map((time) => {
               const selected = time === selectedTime;
               return (
@@ -99,7 +93,7 @@ function RescheduleModal({ initialAppointment, onCancel, onSubmit, visible }: Re
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
 
           <View style={styles.summaryPill}>
             <CareLoopIcon name="calendar" size={18} />
@@ -169,7 +163,7 @@ export default function HomeScreen(): JSX.Element {
         setActivePatientId(patientId);
         setSharedPatient(patient);
         setBackendConnected(true);
-        setAppointment({ date: patient.nextFollowup, weekday: patient.weekday, time: patient.time, status: patient.status === 'not-scheduled' ? 'not-scheduled' : patient.response === 'Confirmed' ? 'confirmed' : patient.response === 'Reschedule requested' ? 'reschedule-requested' : 'awaiting-confirmation' });
+        setAppointment({ date: patient.nextFollowup, weekday: patient.weekday, time: patient.time, status: patient.status === 'missed' ? 'missed' : patient.status === 'not-scheduled' ? 'not-scheduled' : patient.response === 'Confirmed' ? 'confirmed' : patient.response === 'Reschedule requested' ? 'reschedule-requested' : 'awaiting-confirmation' });
       } catch {
         if (active) { setBackendConnected(false); setSharedPatient(null); setAppointment(DEFAULT_APPOINTMENT); }
       }
@@ -245,7 +239,7 @@ export default function HomeScreen(): JSX.Element {
           <View style={styles.nextStepHeader}>
             <View>
               <Text style={styles.eyebrow}>YOUR NEXT STEP</Text>
-              <Text style={styles.nextStepTitle}>Follow-up visit</Text>
+              <Text style={styles.nextStepTitle}>{appointment.status === 'missed' ? 'Missed appointment' : 'Follow-up visit'}</Text>
             </View>
             <View style={styles.calendarIllustration}>
               <CareLoopIcon name="calendar" size={39} />
@@ -256,7 +250,7 @@ export default function HomeScreen(): JSX.Element {
           </View>
 
           <DetailLine icon="calendar" title={appointment.date} detail={appointment.weekday} />
-          <DetailLine icon="clock" title={appointment.time} detail="Please arrive a few minutes early" />
+          <DetailLine icon="clock" title={appointment.time} detail={appointment.status === 'missed' ? 'This visit was marked as a no-show' : 'Please arrive a few minutes early'} />
 
           <View style={styles.doctorLine}>
             <DoctorAvatar />
@@ -270,19 +264,22 @@ export default function HomeScreen(): JSX.Element {
             </View> : null}
           </View>
 
-          <View style={styles.sharedAction}>
+          {appointment.status === 'missed' ? <View style={styles.missedBanner}>
+            <CareLoopIcon color={C.red} name="info" size={18} />
+            <Text style={styles.missedBannerText}>Your care team marked this appointment as a no-show. Request a new time if you still need care.</Text>
+          </View> : <View style={styles.sharedAction}>
             <CareLoopIcon name="heart" size={18} />
             <View style={styles.detailCopy}>
               <Text style={styles.sharedActionEyebrow}>CARE TEAM UPDATE</Text>
               <Text style={styles.sharedActionText}>{sharedPatient?.nextAction ?? 'Your care team’s next step will appear here.'}</Text>
             </View>
-          </View>
+          </View>}
 
-          <Pressable accessibilityLabel="Confirm attendance for follow-up appointment" accessibilityRole="button" disabled={isSavingConfirmation || !backendConnected || !activePatientId} onPress={() => void confirmAttendance()} style={[styles.primaryAction, (isSavingConfirmation || !backendConnected || !activePatientId) && styles.disabledAction]}>
+          {appointment.status !== 'missed' ? <Pressable accessibilityLabel="Confirm attendance for follow-up appointment" accessibilityRole="button" disabled={isSavingConfirmation || !backendConnected || !activePatientId} onPress={() => void confirmAttendance()} style={[styles.primaryAction, (isSavingConfirmation || !backendConnected || !activePatientId) && styles.disabledAction]}>
             <CareLoopIcon color="#FFFFFF" name="calendar" size={19} />
             <Text style={styles.primaryActionText}>{isSavingConfirmation ? 'Saving…' : 'I’ll attend'}</Text>
             <CareLoopIcon color="#FFFFFF" name="chevron" size={18} />
-          </Pressable>
+          </Pressable> : null}
           <Pressable accessibilityRole="button" onPress={() => setIsRescheduleVisible(true)} style={styles.secondaryAction}>
             <CareLoopIcon name="calendar" size={19} />
             <Text style={styles.secondaryActionText}>Request reschedule</Text>
@@ -325,8 +322,8 @@ export default function HomeScreen(): JSX.Element {
               <CareLoopIcon name="reminder" size={22} />
             </View>
             <View style={styles.reminderCopy}>
-              <Text style={styles.reminderTitle}>Reminder</Text>
-              <Text style={styles.detailText}>Follow-up visit · {appointment.time}</Text>
+              <Text style={styles.reminderTitle}>{appointment.status === 'missed' ? 'Appointment update' : 'Reminder'}</Text>
+              <Text style={styles.detailText}>{appointment.status === 'missed' ? 'Missed follow-up' : 'Follow-up visit'} · {appointment.time}</Text>
             </View>
             <CareLoopIcon name="chevron" size={18} color={C.secondary} />
           </CareLoopCard>
@@ -375,6 +372,8 @@ const styles = StyleSheet.create({
   sharedAction: { alignItems: 'center', backgroundColor: '#F1F7FF', borderRadius: 12, flexDirection: 'row', gap: 9, marginTop: 8, paddingHorizontal: 10, paddingVertical: 9 },
   sharedActionEyebrow: { color: C.blue, fontSize: 9, fontWeight: '800', letterSpacing: 0.7 },
   sharedActionText: { color: C.navy, fontSize: 12, fontWeight: '700', lineHeight: 16, marginTop: 2 },
+  missedBanner: { alignItems: 'center', backgroundColor: '#FFF0F1', borderColor: '#F2B9BE', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 9, marginTop: 8, paddingHorizontal: 10, paddingVertical: 9 },
+  missedBannerText: { color: '#8C454C', flex: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
   doctorName: { color: C.navy, fontSize: 14, fontWeight: '700', lineHeight: 18 },
   connectedBadge: { alignItems: 'center', backgroundColor: C.greenSurface, borderRadius: 14, flexDirection: 'row', gap: 4, paddingHorizontal: 7, paddingVertical: 5 },
   connectedDot: { backgroundColor: C.green, borderRadius: 5, height: 8, width: 8 },
@@ -408,7 +407,7 @@ const styles = StyleSheet.create({
   reminderCopy: { flex: 1 },
   reminderTitle: { color: C.navy, fontSize: 14, fontWeight: '800', lineHeight: 18 },
   modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(8, 55, 110, 0.3)', flex: 1, justifyContent: 'center', padding: 18 },
-  modalCard: { backgroundColor: C.surface, borderColor: C.line, borderRadius: 26, borderWidth: 1, elevation: 16, maxWidth: 420, padding: 20, shadowColor: C.navy, shadowOffset: { height: 12, width: 0 }, shadowOpacity: 0.18, shadowRadius: 24, width: '100%' },
+  modalCard: { backgroundColor: C.surface, borderColor: C.line, borderRadius: 26, borderWidth: 1, elevation: 16, maxHeight: '92%', maxWidth: 420, padding: 20, shadowColor: C.navy, shadowOffset: { height: 12, width: 0 }, shadowOpacity: 0.18, shadowRadius: 24, width: '100%' },
   modalHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: 15 },
   modalIcon: { alignItems: 'center', backgroundColor: C.surfaceBlue, borderRadius: 23, height: 52, justifyContent: 'center', width: 52 },
   modalHeaderCopy: { flex: 1 },
@@ -416,14 +415,25 @@ const styles = StyleSheet.create({
   modalTitle: { color: C.navyDeep, fontSize: 20, fontWeight: '800', lineHeight: 26, marginTop: 2 },
   modalSubtitle: { color: C.secondary, fontSize: 13, lineHeight: 18, marginTop: 2 },
   fieldLabel: { color: C.navy, fontSize: 13, fontWeight: '800', marginBottom: 8, marginTop: 8 },
-  choiceRow: { flexDirection: 'row', gap: 7 },
-  choice: { alignItems: 'center', backgroundColor: C.canvas, borderColor: '#D5E6F3', borderRadius: 13, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: 2 },
+  calendarScroll: { backgroundColor: C.canvas, borderColor: '#D5E6F3', borderRadius: 15, borderWidth: 1, maxHeight: 176 },
+  calendarContent: { padding: 10 },
+  calendarMonth: { marginBottom: 8 },
+  calendarMonthTitle: { color: C.navy, fontSize: 13, fontWeight: '800', marginBottom: 7 },
+  calendarWeekHeader: { flexDirection: 'row', marginBottom: 3 },
+  calendarWeekday: { color: C.secondary, flex: 1, fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calendarDay: { alignItems: 'center', aspectRatio: 1.25, justifyContent: 'center', width: '14.2857%' },
+  calendarDayDisabled: { opacity: 0.35 },
+  calendarDaySelected: { backgroundColor: C.blue, borderRadius: 15 },
+  calendarDayText: { color: C.navy, fontSize: 12, fontWeight: '700' },
+  calendarDayTextDisabled: { color: C.secondary },
+  calendarDayTextSelected: { color: C.surface, fontWeight: '800' },
+  timeScroll: { backgroundColor: C.canvas, borderColor: '#D5E6F3', borderRadius: 15, borderWidth: 1, maxHeight: 124 },
+  timeContent: { gap: 6, padding: 8 },
   choiceSelected: { backgroundColor: C.blue, borderColor: C.blue },
-  choiceDate: { color: C.navy, fontSize: 12, fontWeight: '800' },
-  choiceWeekday: { color: C.secondary, fontSize: 10, marginTop: 2 },
   choiceTextSelected: { color: C.surface },
-  timeChoice: { alignItems: 'center', backgroundColor: C.canvas, borderColor: '#D5E6F3', borderRadius: 13, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 43 },
-  timeText: { color: C.navy, fontSize: 12, fontWeight: '800' },
+  timeChoice: { alignItems: 'center', backgroundColor: C.surface, borderColor: '#D5E6F3', borderRadius: 11, borderWidth: 1, justifyContent: 'center', minHeight: 42, paddingHorizontal: 12 },
+  timeText: { color: C.navy, fontSize: 13, fontWeight: '800' },
   summaryPill: { alignItems: 'center', backgroundColor: C.surfaceBlue, borderColor: '#D2E9F8', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 8, marginTop: 15, paddingHorizontal: 11, paddingVertical: 10 },
   summaryText: { color: C.navy, flex: 1, fontSize: 12, fontWeight: '700' },
   modalActions: { flexDirection: 'row', gap: 9, marginTop: 15 },

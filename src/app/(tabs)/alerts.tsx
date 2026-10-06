@@ -10,6 +10,7 @@ const FILTERS: readonly { key: AlertFilter; label: string }[] = [
 ];
 
 function appointmentMessage(appointment: AppointmentSchedule): string {
+  if (appointment.status === 'missed') return `Your care team marked the ${appointment.date} appointment as a no-show. Contact your care team to arrange the next step.`;
   if (appointment.status === 'confirmed') return `Your appointment is confirmed for ${appointment.date} at ${appointment.time}.`;
   if (appointment.status === 'reschedule-requested') return `Your reschedule request for ${appointment.date} at ${appointment.time} is awaiting confirmation.`;
   return `Your appointment is scheduled for ${appointment.date} at ${appointment.time}.`;
@@ -34,7 +35,7 @@ export default function AlertsScreen(): JSX.Element {
   const showAppointment = hasAppointment && (filter === 'all' || filter === 'appointments');
 
   return (
-    <PatientAppFrame activeTab="messages" backgroundColor={C.surface}>
+    <PatientAppFrame activeTab="more" backgroundColor={C.surface}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Pressable accessibilityLabel="Back to Home" accessibilityRole="button" onPress={() => router.replace('/home')} style={styles.backButton}><Text style={styles.backChevron}>‹</Text></Pressable>
@@ -50,10 +51,10 @@ export default function AlertsScreen(): JSX.Element {
 
         {error ? <Text accessibilityRole="alert" style={styles.emptyBody}>{error}</Text> : null}
         {loading ? <Text style={styles.emptyBody}>Loading care updates…</Text> : null}
-        {!loading && !error && showAppointment ? <Pressable accessibilityRole="button" accessibilityLabel={`Appointment update. ${appointmentMessage(appointment)}`} onPress={() => router.push({ pathname: '/alert-detail', params: { type: 'upcoming' } })}>
+        {!loading && !error && showAppointment ? <Pressable accessibilityRole="button" accessibilityLabel={`Appointment update. ${appointmentMessage(appointment)}`} onPress={() => router.push({ pathname: '/alert-detail', params: { type: appointment.status === 'missed' ? 'missed' : 'upcoming' } })}>
           <CareLoopCard style={styles.notificationCard}>
-            <View style={styles.alertIcon}><CareLoopIcon color={C.blue} name="calendar" size={22} /></View>
-            <View style={styles.notificationCopy}><Text style={styles.notificationTitle}>{appointment.status === 'confirmed' ? 'Appointment confirmed' : appointment.status === 'reschedule-requested' ? 'Reschedule requested' : 'Upcoming appointment'}</Text><Text style={styles.notificationBody}>{appointmentMessage(appointment)}</Text></View>
+            <View style={[styles.alertIcon, appointment.status === 'missed' && styles.missedAlertIcon]}><CareLoopIcon color={appointment.status === 'missed' ? C.red : C.blue} name="calendar" size={22} /></View>
+            <View style={styles.notificationCopy}><Text style={styles.notificationTitle}>{appointment.status === 'missed' ? 'Appointment missed' : appointment.status === 'confirmed' ? 'Appointment confirmed' : appointment.status === 'reschedule-requested' ? 'Reschedule requested' : 'Upcoming appointment'}</Text><Text style={styles.notificationBody}>{appointmentMessage(appointment)}</Text></View>
             <CareLoopIcon name="chevron" size={17} color={C.secondary} />
           </CareLoopCard>
         </Pressable> : null}
@@ -73,6 +74,6 @@ const styles = StyleSheet.create({
   header: { alignItems: 'flex-start', flexDirection: 'row', marginBottom: 4, minHeight: 58 }, backButton: { alignItems: 'center', height: 42, justifyContent: 'center', marginRight: 8, width: 27 }, backChevron: { color: C.navy, fontSize: 38, fontWeight: '300', lineHeight: 40, marginTop: -4 },
   headerCopy: { flex: 1, paddingRight: 5 }, title: { color: C.navyDeep, fontSize: 25, fontWeight: '800', lineHeight: 31 }, subtitle: { color: C.secondary, fontSize: 13, lineHeight: 19, marginTop: 2 },
   filterList: { alignItems: 'center', gap: 8, paddingBottom: 5, paddingRight: 8 }, filterChip: { alignItems: 'center', backgroundColor: '#F2F6FA', borderRadius: 22, justifyContent: 'center', minHeight: 38, paddingHorizontal: 15 }, filterChipSelected: { backgroundColor: C.surfaceBlueStrong }, filterText: { color: C.navy, fontSize: 12, fontWeight: '600' }, filterTextSelected: { color: C.blue, fontWeight: '800' },
-  notificationCard: { alignItems: 'center', flexDirection: 'row', gap: 11, minHeight: 90, paddingHorizontal: 12, paddingVertical: 12 }, alertIcon: { alignItems: 'center', backgroundColor: '#EAF4FF', borderRadius: 25, height: 50, justifyContent: 'center', width: 50 }, notificationCopy: { flex: 1, minWidth: 0 }, notificationTitle: { color: C.navyDeep, fontSize: 14, fontWeight: '800', lineHeight: 19 }, notificationBody: { color: C.secondary, fontSize: 12, lineHeight: 18, marginTop: 3 },
+  notificationCard: { alignItems: 'center', flexDirection: 'row', gap: 11, minHeight: 90, paddingHorizontal: 12, paddingVertical: 12 }, alertIcon: { alignItems: 'center', backgroundColor: '#EAF4FF', borderRadius: 25, height: 50, justifyContent: 'center', width: 50 }, missedAlertIcon: { backgroundColor: '#FFF0F1' }, notificationCopy: { flex: 1, minWidth: 0 }, notificationTitle: { color: C.navyDeep, fontSize: 14, fontWeight: '800', lineHeight: 19 }, notificationBody: { color: C.secondary, fontSize: 12, lineHeight: 18, marginTop: 3 },
   emptyCard: { alignItems: 'center', marginTop: 8, paddingHorizontal: 24, paddingVertical: 28 }, emptyIcon: { alignItems: 'center', backgroundColor: C.surfaceBlue, borderRadius: 28, height: 56, justifyContent: 'center', width: 56 }, emptyTitle: { color: C.navy, fontSize: 17, fontWeight: '800', marginTop: 12 }, emptyBody: { color: C.secondary, fontSize: 13, lineHeight: 19, marginTop: 5, textAlign: 'center' },
 });

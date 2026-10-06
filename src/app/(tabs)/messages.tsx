@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { CareLoopCard, CareLoopColors as C, CareLoopIcon, PatientAppFrame } from '@/components/careloop-ui';
 import { getActivePatientId, getPatientAppMessages, getPatientAppPatient, getPatientReportUrl, sendPatientAppMessage, type PatientAppAttachment, type PatientAppMessage, type PatientAppPatient } from '@/lib/patient-backend';
@@ -7,6 +8,7 @@ import { loadLinkedPatientRecord } from '@/lib/patient';
 
 
 export default function MessagesScreen(): JSX.Element {
+  const router = useRouter();
   const [messages, setMessages] = useState<PatientAppMessage[]>([]);
   const [patientId, setPatientId] = useState('');
   const [patient, setPatient] = useState<PatientAppPatient | null>(null);
@@ -16,23 +18,46 @@ export default function MessagesScreen(): JSX.Element {
   const [reportPath, setReportPath] = useState<string | null>(null);
   const [reportName, setReportName] = useState('');
   const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const scroll = useRef<ScrollView>(null);
 
   useEffect(() => {
     let active = true;
+    let connected = false;
     const refresh = async (): Promise<void> => {
       try {
         const selectedPatientId = await getActivePatientId();
         const [latest, selectedPatient, record] = await Promise.all([getPatientAppMessages(selectedPatientId), getPatientAppPatient(selectedPatientId), loadLinkedPatientRecord()]);
         const report = record?.reports[0] ?? null;
         const selectedReportUrl = report ? await getPatientReportUrl(report.file_path) : null;
-        if (active) { setPatientId(selectedPatientId); setMessages(latest); setPatient(selectedPatient); setReportUrl(selectedReportUrl); setReportPath(report?.file_path ?? null); setReportName(report?.file_name ?? ''); }
-      } catch (error) { if (active) Alert.alert('Care team unavailable', error instanceof Error ? error.message : 'Sign in and connect your care team to load messages.'); }
+        if (active) {
+          connected = true;
+          setPatientId(selectedPatientId);
+          setMessages(latest);
+          setPatient(selectedPatient);
+          setReportUrl(selectedReportUrl);
+          setReportPath(report?.file_path ?? null);
+          setReportName(report?.file_name ?? '');
+          setLoadError('');
+        }
+      } catch (error) {
+        if (active) {
+          connected = false;
+          const reason = error instanceof Error ? error.message.toLowerCase() : '';
+          setLoadError(reason.includes('sign in') || reason.includes('connect your care team')
+            ? 'Sign in and connect your care team to view messages.'
+            : 'We couldn’t load your messages. Check your connection and try again.');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
     };
     void refresh();
-    const timer = setInterval(() => void refresh(), 5000);
+    const timer = setInterval(() => { if (connected) void refresh(); }, 30000);
     return () => { active = false; clearInterval(timer); };
-  }, []);
+  }, [retryCount]);
 
   const send = async (text = draft.trim(), attachment = pendingImage): Promise<void> => {
     if ((!text && !attachment) || sending) return;
@@ -63,6 +88,15 @@ export default function MessagesScreen(): JSX.Element {
   return (
     <PatientAppFrame activeTab="messages" backgroundColor={C.canvas}>
       <View style={styles.screen}>
+        {loadError ? <View style={styles.unavailableWrap}>
+          <CareLoopCard style={styles.unavailableCard}>
+            <View style={styles.unavailableIcon}><CareLoopIcon color={C.blue} name="doctor" size={25} /></View>
+            <Text style={styles.unavailableTitle}>Care team unavailable</Text>
+            <Text style={styles.unavailableCopy}>{loadError}</Text>
+            <Pressable accessibilityRole="button" onPress={() => { setLoading(true); setLoadError(''); setRetryCount((count) => count + 1); }} style={styles.retryButton}><Text style={styles.retryText}>Try again</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.connectButton}><Text style={styles.connectText}>Sign in or connect care team</Text></Pressable>
+          </CareLoopCard>
+        </View> : loading ? <View accessibilityRole="progressbar" style={styles.loadingState}><Text style={styles.loadingText}>Loading your care-team conversation…</Text></View> : <>
         <View style={styles.header}>
           <View style={styles.doctorAvatar}><CareLoopIcon name="doctor" size={21} /></View>
           <View style={styles.headerCopy}><Text style={styles.title}>{patient?.doctor ?? 'Care team'}</Text><Text style={styles.subtitle}>{patient?.department ?? 'Care coordination'} · {patient?.name ?? 'Loading patient'}</Text></View>
@@ -82,6 +116,7 @@ export default function MessagesScreen(): JSX.Element {
           <TextInput accessibilityLabel="Write a message" multiline maxLength={1200} onChangeText={setDraft} placeholder="Write a message…" placeholderTextColor={C.muted} style={styles.input} value={draft} />
           <Pressable accessibilityLabel="Send message" disabled={sending || (!draft.trim() && !pendingImage)} onPress={() => void send()} style={[styles.sendButton, (sending || (!draft.trim() && !pendingImage)) && styles.sendDisabled]}><CareLoopIcon color="#FFFFFF" name="send" size={18} /></Pressable>
         </View>
+        </>}
       </View>
     </PatientAppFrame>
   );
@@ -104,6 +139,17 @@ function MessageBubble({ message }: { message: PatientAppMessage }): JSX.Element
 
 const styles = StyleSheet.create({
   screen: { flex: 1, alignSelf: 'center', maxWidth: 560, width: '100%', backgroundColor: C.surface },
+  unavailableWrap: { flex: 1, justifyContent: 'center', padding: 22 },
+  unavailableCard: { alignItems: 'center', padding: 22 },
+  unavailableIcon: { alignItems: 'center', backgroundColor: C.surfaceBlue, borderRadius: 29, height: 58, justifyContent: 'center', width: 58 },
+  unavailableTitle: { color: C.navyDeep, fontSize: 19, fontWeight: '800', marginTop: 14, textAlign: 'center' },
+  unavailableCopy: { color: C.secondary, fontSize: 13, lineHeight: 19, marginTop: 7, textAlign: 'center' },
+  retryButton: { alignItems: 'center', backgroundColor: C.blue, borderRadius: 14, justifyContent: 'center', marginTop: 19, minHeight: 46, paddingHorizontal: 18, width: '100%' },
+  retryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  connectButton: { alignItems: 'center', justifyContent: 'center', marginTop: 8, minHeight: 44, paddingHorizontal: 12, width: '100%' },
+  connectText: { color: C.blue, fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  loadingState: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
+  loadingText: { color: C.secondary, fontSize: 13, textAlign: 'center' },
   header: { alignItems: 'center', borderBottomColor: C.line, borderBottomWidth: 1, flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 11 },
   doctorAvatar: { alignItems: 'center', backgroundColor: C.surfaceBlue, borderRadius: 23, height: 44, justifyContent: 'center', width: 44 },
   headerCopy: { flex: 1 }, title: { color: C.navyDeep, fontSize: 15, fontWeight: '800' }, subtitle: { color: C.secondary, fontSize: 10, marginTop: 3 },
